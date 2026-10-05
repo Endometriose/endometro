@@ -1,0 +1,178 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Nunito:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Garante que o header fixo (~80px) não cubra o topo das seções âncora
+   Aplica-se a TODAS as seções e divs com id, cobrindo todos os itens do menu */
+section[id],
+div[id] {
+  scroll-margin-top: 90px;
+}
+
+@layer base {
+  :root {
+    /* Fundo do site em Rosa Claro Suave + Acentos em Rosa Escuro */
+    --background: 352 65% 95%;      /* #FAEDED - Rosa Claro Suave */
+    --foreground: 352 45% 22%;      /* #5C2228 - Rosa Queimado Escuro */
+
+    --card: 352 60% 98%;            /* #FDF5F6 - Rosa Pastel Claro */
+    --card-foreground: 352 45% 22%;
+
+    --popover: 352 60% 98%;
+    --popover-foreground: 352 45% 22%;
+
+    /* Primary: Rosa Médio Vibrante (#D65C6A) */
+    --primary: 352 58% 54%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary: Rosa Escuro Elegante (#9E3B46 - Rosa mais escuro que o fundo do site) */
+    --secondary: 352 48% 42%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Muted & Accents */
+    --muted: 352 50% 91%;           /* #F6DCDD - Rosa Claro Muted */
+    --muted-foreground: 352 30% 40%;
+
+    --accent: 352 55% 88%;          /* #F4D2D5 - Rosa Claro Accent */
+    --accent-foreground: 352 45% 22%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 352 40% 86%;
+    --input: 352 40% 86%;
+    --ring: 352 58% 54%;
+
+    --radius: 0.75rem;
+
+    /* Tokens Customizados de Rosa */
+    --rose-marsala: 352 48% 42%;    /* #9E3B46 - Rosa Escuro */
+    --rose-wine: 352 48% 42%;       /* #9E3B46 - Rosa Escuro */
+    --rose-mauve: 352 50% 50%;      /* #BE4B58 - Rosa Médio */
+    --rose-dusty: 352 55% 65%;      /* #D97884 - Rosa Queimado */
+    --rose-blush: 352 65% 88%;      /* #F4D2D5 - Rosa Claro */
+    --rose-pale: 352 65% 95%;       /* #FAEDED - Rosa Claro Fundo */
+    --pink-soft: 352 65% 95%;       /* #FAEDED - Rosa Claro */
+
+    --sidebar-background: 352 65% 95%;
+    --sidebar-foreground: 352 45% 22%;
+    --sidebar-primary: 352 58% 54%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 352 48% 42%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 352 40% 86%;
+    --sidebar-ring: 352 58% 54%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body;
+    font-size: 16px;
+    line-height: 1.6;
+    font-variant-numeric: tabular-nums;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+    font-weight: 700;
+  }
+  
+  h1 { font-size: clamp(2rem, 5vw, 4rem); line-height: 1.1; }
+  h2 { font-size: clamp(1.75rem, 4vw, 3rem); line-height: 1.2; }
+  h3 { font-size: clamp(1.5rem, 3vw, 2.25rem); line-height: 1.3; }
+}
+
+@keyframes rotate3d {
+  0% {
+    transform: perspective(1000px) rotateY(0deg) rotateX(3deg) scale(1);
+  }
+  50% {
+    transform: perspective(1000px) rotateY(180deg) rotateX(-3deg) scale(1.04);
+  }
+  100% {
+    transform: perspective(1000px) rotateY(360deg) rotateX(3deg) scale(1);
+  }
+}
+
+.animate-rotate-3d {
+  animation: rotate3d 14s ease-in-out infinite;
+  transform-style: preserve-3d;
+}
+
+/* Passo 5 da Skill — Contenção dos gráficos de pizza (sem alterar paleta ou layout) */
+.recharts-wrapper,
+.recharts-surface {
+  max-width: 100% !important;
+  overflow: visible;
+}
+
+.recharts-legend-wrapper {
+  white-space: normal !important;
+  word-break: break-word !important;
+}
+
+.recharts-legend-item-text {
+  font-size: 0.72rem !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  max-width: 90%;
+}
+
+/* Animações de Rolagem (Scrollspy / IntersectionObserver) */
+section[id] {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+}
+
+section[id].section-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.highlight-title {
+  position: relative;
+  display: inline-block;
+}
+
+.highlight-title::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  width: 100%;
+  height: 3px;
+  background-color: hsl(var(--primary));
+  animation: highlightDraw 2s ease-in-out forwards;
+}
+
+@keyframes highlightDraw {
+  0% { width: 0; opacity: 1; }
+  50% { width: 100%; opacity: 1; }
+  100% { width: 100%; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  section[id] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .highlight-title::after {
+    animation: none;
+  }
+}

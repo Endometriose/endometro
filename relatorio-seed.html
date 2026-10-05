@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Endometriômetro — Relatório de Dados de Teste (FASE 2C)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    :root {
+      --rosa:#e91e8c;--roxo:#7c3aed;--verde:#059669;--amber:#d97706;--cinza:#64748b;
+      --bg:#0f172a;--card:#1e293b;--border:#334155;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:#e2e8f0;min-height:100vh;padding:2rem 1rem}
+    .header{text-align:center;margin-bottom:3rem}
+    .badge-fase{display:inline-flex;align-items:center;gap:.4rem;background:linear-gradient(135deg,#e91e8c22,#7c3aed22);border:1px solid #e91e8c55;color:#f472b6;padding:.3rem .9rem;border-radius:99px;font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:1rem}
+    h1{font-size:2rem;font-weight:700;color:#f8fafc;margin-bottom:.4rem}
+    .subtitle{color:var(--cinza);font-size:.95rem}
+    .aviso-teste{display:flex;align-items:center;gap:.8rem;background:#78350f22;border:2px solid #d9770655;color:#fcd34d;padding:1rem 1.4rem;border-radius:.75rem;max-width:900px;margin:0 auto 2.5rem;font-size:.875rem;font-weight:500}
+    .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;max-width:900px;margin:0 auto 3rem}
+    .s-card{background:var(--card);border:1px solid var(--border);border-radius:.75rem;padding:1.25rem;text-align:center}
+    .s-card .num{font-size:2.5rem;font-weight:700;line-height:1}
+    .s-card .lbl{font-size:.8rem;color:var(--cinza);margin-top:.4rem}
+    .s-card.rosa .num{color:var(--rosa)}.s-card.roxo .num{color:#a78bfa}.s-card.verde .num{color:#34d399}.s-card.amber .num{color:#fbbf24}
+    .tabs{display:flex;gap:.5rem;max-width:900px;margin:0 auto 1.5rem;border-bottom:2px solid var(--border)}
+    .tab-btn{background:none;border:none;color:var(--cinza);font-family:'Inter',sans-serif;font-size:.9rem;font-weight:500;padding:.65rem 1.25rem;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s;border-radius:.5rem .5rem 0 0}
+    .tab-btn:hover{color:#e2e8f0;background:#ffffff08}
+    .tab-btn.active{color:var(--rosa);border-bottom-color:var(--rosa);background:#e91e8c0a}
+    .panel{display:none;max-width:900px;margin:0 auto}.panel.active{display:block}
+    .section-title{font-size:1rem;font-weight:600;color:#cbd5e1;margin:2rem 0 1rem;border-left:3px solid var(--rosa);padding-left:.75rem}
+    .bairro-block{background:var(--card);border:1px solid var(--border);border-radius:.75rem;overflow:hidden;margin-bottom:1.25rem}
+    .bairro-header{display:flex;align-items:center;justify-content:space-between;padding:.85rem 1.25rem;background:#0f172a;border-bottom:1px solid var(--border)}
+    .bairro-name{font-weight:600;font-size:.95rem}
+    .bairro-stat{font-size:.78rem;color:var(--cinza);background:#1e293b;border:1px solid var(--border);padding:.2rem .6rem;border-radius:99px}
+    .data-table{width:100%;border-collapse:collapse;font-size:.83rem}
+    .data-table th{text-align:left;padding:.6rem 1rem;color:var(--cinza);font-weight:500;border-bottom:1px solid var(--border);font-size:.76rem;text-transform:uppercase;letter-spacing:.04em}
+    .data-table td{padding:.65rem 1rem;border-bottom:1px solid #1e293b;vertical-align:middle}
+    .data-table tr:last-child td{border-bottom:none}
+    .data-table tr:hover td{background:#ffffff04}
+    .badge{display:inline-flex;align-items:center;padding:.2rem .55rem;border-radius:99px;font-size:.72rem;font-weight:600}
+    .badge-sim{background:#450a0a;color:#fca5a5;border:1px solid #7f1d1d}
+    .badge-nao{background:#052e16;color:#6ee7b7;border:1px solid #064e3b}
+    .badge-alta{background:#450a0a;color:#fca5a5}
+    .badge-baixa{background:#052e16;color:#6ee7b7}
+    .tag-sintoma{display:inline-block;background:#4c1d9522;color:#c4b5fd;border:1px solid #4c1d9555;padding:.1rem .45rem;border-radius:99px;font-size:.68rem;margin:.1rem .1rem .1rem 0}
+    .empresa-header{display:flex;align-items:center;gap:1rem;background:linear-gradient(135deg,#7c3aed15,#e91e8c10);border:1px solid #7c3aed33;border-radius:.75rem;padding:1.25rem 1.5rem;margin-bottom:1.5rem}
+    .empresa-avatar{width:48px;height:48px;background:linear-gradient(135deg,var(--roxo),var(--rosa));border-radius:.75rem;display:flex;align-items:center;justify-content:center;font-size:1.4rem}
+    .empresa-info h3{font-size:1.05rem;font-weight:700}
+    .empresa-info p{font-size:.8rem;color:var(--cinza);margin-top:.2rem}
+    .combined-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem;margin-bottom:2rem}
+    .stat-block{background:var(--card);border:1px solid var(--border);border-radius:.75rem;padding:1.25rem}
+    .stat-block h4{font-size:.85rem;color:var(--cinza);font-weight:500;margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.04em}
+    .stat-row{display:flex;justify-content:space-between;align-items:center;padding:.35rem 0;border-bottom:1px solid var(--border);font-size:.85rem}
+    .stat-row:last-child{border-bottom:none}
+    .stat-val{font-weight:600;color:#f8fafc}
+    .stat-pct{font-size:.75rem;color:var(--rosa);font-weight:600}
+    .bar-wrap{height:6px;background:var(--border);border-radius:99px;margin-top:.5rem;overflow:hidden}
+    .bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--rosa),var(--roxo))}
+    footer{text-align:center;color:#475569;font-size:.78rem;margin-top:4rem}
+  </style>
+</head>
+<body>
+<div class="header">
+  <div class="badge-fase">⚗️ FASE 2C — Dados de Teste</div>
+  <h1>🌸 Endometriômetro</h1>
+  <p class="subtitle">Relatório dos dados de seed — Lote <strong>TESTE-2026-10</strong></p>
+</div>
+
+<div class="aviso-teste">
+  <span style="font-size:1.3rem">⚗️</span>
+  <span><strong>Dados 100% fictícios.</strong> Gerados para fins de teste interno da FASE 2C. Nunca representam respostas reais de participantes.</span>
+</div>
+
+<div class="summary-grid">
+  <div class="s-card rosa"><div class="num">30</div><div class="lbl">Total de Respostas</div></div>
+  <div class="s-card roxo"><div class="num">10</div><div class="lbl">Colaboradoras (empresa)</div></div>
+  <div class="s-card verde"><div class="num">20</div><div class="lbl">Individuais (4 bairros)</div></div>
+  <div class="s-card amber"><div class="num">40%</div><div class="lbl">Com Sintomas</div></div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="showTab('individual',this)">👩 Individual (20)</button>
+  <button class="tab-btn" onclick="showTab('empresa',this)">🏢 Empresa (10)</button>
+  <button class="tab-btn" onclick="showTab('combinado',this)">📊 Combinado (30)</button>
+</div>
+
+<!-- INDIVIDUAL -->
+<div id="tab-individual" class="panel active">
+  <p class="section-title">4 bairros × 5 participantes — 2 com sintomas, 3 sem por bairro</p>
+
+  <!-- Centro -->
+  <div class="bairro-block">
+    <div class="bairro-header">
+      <span class="bairro-name">📍 Centro — Teixeira de Freitas, BA</span>
+      <span class="bairro-stat">2 com sintomas · 3 sem</span>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>#</th><th>Faixa Etária</th><th>Diagnóstico</th><th>Sintomas</th><th>Dor</th><th>Horas/mês</th><th>Dias atestado</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>25–34 anos</td><td><span class="badge badge-sim">Sim</span></td><td><span class="tag-sintoma">cólica intensa</span><span class="tag-sintoma">dor pélvica crônica</span></td><td>7/10</td><td>8h</td><td>1</td></tr>
+        <tr><td>2</td><td>35–44 anos</td><td><span class="badge badge-sim">Em invest.</span></td><td><span class="tag-sintoma">dor na relação</span><span class="tag-sintoma">fadiga extrema</span><span class="tag-sintoma">ansiedade por dor</span></td><td>8/10</td><td>12h</td><td>2</td></tr>
+        <tr><td>3</td><td>18–24 anos</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td>0h</td><td>0</td></tr>
+        <tr><td>4</td><td>45–54 anos</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td>0h</td><td>0</td></tr>
+        <tr><td>5</td><td>25–34 anos</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td>0h</td><td>0</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Vila Vargas -->
+  <div class="bairro-block">
+    <div class="bairro-header">
+      <span class="bairro-name">📍 Vila Vargas — Teixeira de Freitas, BA</span>
+      <span class="bairro-stat">2 com sintomas · 3 sem</span>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>#</th><th>Faixa Etária</th><th>Diagnóstico</th><th>Sintomas</th><th>Dor</th><th>Horas/mês</th><th>Dias atestado</th></tr></thead>
+      <tbody>
+        <tr><td>6</td><td>35–44 anos</td><td><span class="badge badge-sim">Sim</span></td><td><span class="tag-sintoma">dor no intestino</span><span class="tag-sintoma">uso de analgésicos</span></td><td>9/10</td><td>16h</td><td>3</td></tr>
+        <tr><td>7</td><td>18–24 anos</td><td><span class="badge badge-sim">Em invest.</span></td><td><span class="tag-sintoma">histórico familiar</span><span class="tag-sintoma">dificuldade de engravidar</span></td><td>7/10</td><td>8h</td><td>1</td></tr>
+        <tr><td>8</td><td>25–34 anos</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td>0h</td><td>0</td></tr>
+        <tr><td>9</td><td>45–54 anos</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td>0h</td><td>0</td></tr>
+        <tr><td>10</td><td>55 anos ou +</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td>0h</td><td>0</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Bom Jesus -->
+  <div class="bairro-block">
+    <div class="bairro-header">
+      <span class="bairro-name">📍 Bom Jesus — Teixeira de Freitas, BA</span>
+      <span class="bairro-stat">2 com sintomas · 3 sem</span>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>#</th><th>Faixa Etária</th><th>Diagnóstico</th><th>Sintomas</th><th>Dor</th><th>Horas/mês</th><th>Dias atestado</th></tr></thead>
+      <tbody>
+        <tr><td>11</td><td>18–24 anos</td><td><span class="badge badge-sim">Sim</span></td><td><span class="tag-sintoma">dor ao urinar</span><span class="tag-sintoma">dor lombar/pernas</span></td><td>8/10</td><td>12h</td><td>2</td></tr>
+        <tr><td>12</td><td>25–34 anos</td><td><span class="badge badge-sim">Em invest.</span></td><td><span class="tag-sintoma">cólica intensa</span><span class="tag-sintoma">dor na relação</span><span class="tag-sintoma">histórico de cistos</span></td><td>9/10</td><td>16h</td><td>3</td></tr>
+        <tr><td>13</td><td>35–44 anos</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td>0h</td><td>0</td></tr>
+        <tr><td>14</td><td>45–54 anos</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td>0h</td><td>0</td></tr>
+        <tr><td>15</td><td>18–24 anos</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td>0h</td><td>0</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Recanto do Lago -->
+  <div class="bairro-block">
+    <div class="bairro-header">
+      <span class="bairro-name">📍 Recanto do Lago — Teixeira de Freitas, BA</span>
+      <span class="bairro-stat">2 com sintomas · 3 sem</span>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>#</th><th>Faixa Etária</th><th>Diagnóstico</th><th>Sintomas</th><th>Dor</th><th>Horas/mês</th><th>Dias atestado</th></tr></thead>
+      <tbody>
+        <tr><td>16</td><td>25–34 anos</td><td><span class="badge badge-sim">Sim</span></td><td><span class="tag-sintoma">fadiga extrema</span><span class="tag-sintoma">dor pélvica crônica</span></td><td>7/10</td><td>8h</td><td>1</td></tr>
+        <tr><td>17</td><td>35–44 anos</td><td><span class="badge badge-sim">Em invest.</span></td><td><span class="tag-sintoma">uso de analgésicos</span><span class="tag-sintoma">ansiedade por dor</span></td><td>8/10</td><td>12h</td><td>2</td></tr>
+        <tr><td>18</td><td>45–54 anos</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td>0h</td><td>0</td></tr>
+        <tr><td>19</td><td>55 anos ou +</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td>0h</td><td>0</td></tr>
+        <tr><td>20</td><td>18–24 anos</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td>0h</td><td>0</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- EMPRESA -->
+<div id="tab-empresa" class="panel">
+  <div class="empresa-header">
+    <div class="empresa-avatar">🏢</div>
+    <div class="empresa-info">
+      <h3>ctor4.com — Clínica Ctor4 (Teste)</h3>
+      <p>Email: ctor4.com@gmail.com · CNPJ: 31.270.717/0001-87 · Teixeira de Freitas, BA</p>
+    </div>
+  </div>
+  <p class="section-title">10 colaboradoras — 4 com sintomas, 6 sem sintomas</p>
+  <div class="bairro-block">
+    <table class="data-table">
+      <thead><tr><th>#</th><th>Faixa Etária</th><th>Diagnóstico</th><th>Sintomas</th><th>Dor</th><th>Impacto</th><th>Horas/mês</th><th>Dias</th></tr></thead>
+      <tbody>
+        <tr><td>Colab. 1</td><td>35–44 anos</td><td><span class="badge badge-sim">Sim</span></td><td><span class="tag-sintoma">cólica intensa</span><span class="tag-sintoma">dor no intestino</span></td><td>9/10</td><td><span class="badge badge-sim">Sim</span></td><td>16h</td><td>3</td></tr>
+        <tr><td>Colab. 2</td><td>25–34 anos</td><td><span class="badge badge-sim">Em invest.</span></td><td><span class="tag-sintoma">dificuldade de engravidar</span><span class="tag-sintoma">fadiga extrema</span></td><td>7/10</td><td><span class="badge badge-sim">Sim</span></td><td>8h</td><td>1</td></tr>
+        <tr><td>Colab. 3</td><td>18–24 anos</td><td><span class="badge badge-sim">Em invest.</span></td><td><span class="tag-sintoma">histórico de cistos</span><span class="tag-sintoma">dor ao urinar</span></td><td>8/10</td><td><span class="badge badge-sim">Sim</span></td><td>12h</td><td>2</td></tr>
+        <tr><td>Colab. 4</td><td>45–54 anos</td><td><span class="badge badge-sim">Em invest.</span></td><td><span class="tag-sintoma">dor lombar/pernas</span><span class="tag-sintoma">dor na relação</span></td><td>9/10</td><td><span class="badge badge-sim">Sim</span></td><td>16h</td><td>3</td></tr>
+        <tr><td>Colab. 5</td><td>25–34 anos</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td><span class="badge badge-nao">Não</span></td><td>0h</td><td>0</td></tr>
+        <tr><td>Colab. 6</td><td>35–44 anos</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td><span class="badge badge-nao">Não</span></td><td>0h</td><td>0</td></tr>
+        <tr><td>Colab. 7</td><td>18–24 anos</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td><span class="badge badge-nao">Não</span></td><td>0h</td><td>0</td></tr>
+        <tr><td>Colab. 8</td><td>45–54 anos</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td><span class="badge badge-nao">Não</span></td><td>0h</td><td>0</td></tr>
+        <tr><td>Colab. 9</td><td>25–34 anos</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td><span class="badge badge-nao">Não</span></td><td>0h</td><td>0</td></tr>
+        <tr><td>Colab. 10</td><td>35–44 anos</td><td><span class="badge badge-nao">Não</span></td><td>—</td><td>2/10</td><td><span class="badge badge-nao">Não</span></td><td>0h</td><td>0</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- COMBINADO -->
+<div id="tab-combinado" class="panel">
+  <p class="section-title">Estatísticas consolidadas — 30 respostas</p>
+  <div class="combined-grid">
+    <div class="stat-block">
+      <h4>📊 Diagnóstico</h4>
+      <div class="stat-row"><span>Com endometriose</span><span><span class="stat-val">8</span> <span class="stat-pct">27%</span></span></div>
+      <div class="bar-wrap"><div class="bar-fill" style="width:27%"></div></div>
+      <div class="stat-row" style="margin-top:.5rem"><span>Em investigação</span><span><span class="stat-val">4</span> <span class="stat-pct">13%</span></span></div>
+      <div class="bar-wrap"><div class="bar-fill" style="width:13%;background:linear-gradient(90deg,#d97706,#ea580c)"></div></div>
+      <div class="stat-row" style="margin-top:.5rem"><span>Sem endometriose</span><span><span class="stat-val">18</span> <span class="stat-pct">60%</span></span></div>
+      <div class="bar-wrap"><div class="bar-fill" style="width:60%;background:linear-gradient(90deg,#059669,#10b981)"></div></div>
+    </div>
+    <div class="stat-block">
+      <h4>🏥 Por Origem</h4>
+      <div class="stat-row"><span>👩 Individuais</span><span><span class="stat-val">20</span> <span class="stat-pct">67%</span></span></div>
+      <div class="bar-wrap"><div class="bar-fill" style="width:67%"></div></div>
+      <div class="stat-row" style="margin-top:.5rem"><span>🏢 ctor4.com</span><span><span class="stat-val">10</span> <span class="stat-pct">33%</span></span></div>
+      <div class="bar-wrap"><div class="bar-fill" style="width:33%;background:linear-gradient(90deg,#7c3aed,#a78bfa)"></div></div>
+    </div>
+    <div class="stat-block">
+      <h4>📍 Por Bairro</h4>
+      <div class="stat-row"><span>Centro</span><span class="stat-val">5</span></div>
+      <div class="stat-row"><span>Vila Vargas</span><span class="stat-val">5</span></div>
+      <div class="stat-row"><span>Bom Jesus</span><span class="stat-val">5</span></div>
+      <div class="stat-row"><span>Recanto do Lago</span><span class="stat-val">5</span></div>
+      <div class="stat-row"><span>Empresa (sede)</span><span class="stat-val">10</span></div>
+    </div>
+    <div class="stat-block">
+      <h4>⏱️ Impacto Trabalho</h4>
+      <div class="stat-row"><span>Média horas/mês perdidas</span><span class="stat-val">11,5h</span></div>
+      <div class="stat-row"><span>Média dias atestado/ano</span><span class="stat-val">1,8 dias</span></div>
+      <div class="stat-row"><span>Com impacto no trabalho</span><span><span class="stat-val">12</span> <span class="stat-pct">40%</span></span></div>
+    </div>
+    <div class="stat-block">
+      <h4>🎂 Faixas Etárias</h4>
+      <div class="stat-row"><span>18 a 24 anos</span><span class="stat-val">7</span></div>
+      <div class="stat-row"><span>25 a 34 anos</span><span class="stat-val">9</span></div>
+      <div class="stat-row"><span>35 a 44 anos</span><span class="stat-val">9</span></div>
+      <div class="stat-row"><span>45 a 54 anos</span><span class="stat-val">4</span></div>
+      <div class="stat-row"><span>55 anos ou mais</span><span class="stat-val">1</span></div>
+    </div>
+    <div class="stat-block">
+      <h4>🔬 Top 5 Sintomas</h4>
+      <div class="stat-row"><span>Cólica intensa</span><span class="stat-val">4</span></div>
+      <div class="stat-row"><span>Fadiga extrema</span><span class="stat-val">4</span></div>
+      <div class="stat-row"><span>Dor na relação</span><span class="stat-val">3</span></div>
+      <div class="stat-row"><span>Dor pélvica crônica</span><span class="stat-val">3</span></div>
+      <div class="stat-row"><span>Uso de analgésicos</span><span class="stat-val">3</span></div>
+    </div>
+  </div>
+
+  <p class="section-title">Tabela completa — 30 registros</p>
+  <div class="bairro-block">
+    <table class="data-table">
+      <thead><tr><th>#</th><th>Origem</th><th>Localidade</th><th>Faixa Etária</th><th>Diagnóstico</th><th>Dor</th><th>Resultado</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>👩 Individual</td><td>Centro</td><td>25–34 anos</td><td><span class="badge badge-sim">Sim</span></td><td>7</td><td><span class="badge badge-alta">Alta</span></td></tr>
+        <tr><td>2</td><td>👩 Individual</td><td>Centro</td><td>35–44 anos</td><td><span class="badge badge-sim">Em invest.</span></td><td>8</td><td><span class="badge badge-alta">Alta</span></td></tr>
+        <tr><td>3</td><td>👩 Individual</td><td>Centro</td><td>18–24 anos</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>4</td><td>👩 Individual</td><td>Centro</td><td>45–54 anos</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>5</td><td>👩 Individual</td><td>Centro</td><td>25–34 anos</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>6</td><td>👩 Individual</td><td>Vila Vargas</td><td>35–44 anos</td><td><span class="badge badge-sim">Sim</span></td><td>9</td><td><span class="badge badge-alta">Alta</span></td></tr>
+        <tr><td>7</td><td>👩 Individual</td><td>Vila Vargas</td><td>18–24 anos</td><td><span class="badge badge-sim">Em invest.</span></td><td>7</td><td><span class="badge badge-alta">Alta</span></td></tr>
+        <tr><td>8</td><td>👩 Individual</td><td>Vila Vargas</td><td>25–34 anos</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>9</td><td>👩 Individual</td><td>Vila Vargas</td><td>45–54 anos</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>10</td><td>👩 Individual</td><td>Vila Vargas</td><td>55 anos ou +</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>11</td><td>👩 Individual</td><td>Bom Jesus</td><td>18–24 anos</td><td><span class="badge badge-sim">Sim</span></td><td>8</td><td><span class="badge badge-alta">Alta</span></td></tr>
+        <tr><td>12</td><td>👩 Individual</td><td>Bom Jesus</td><td>25–34 anos</td><td><span class="badge badge-sim">Em invest.</span></td><td>9</td><td><span class="badge badge-alta">Alta</span></td></tr>
+        <tr><td>13</td><td>👩 Individual</td><td>Bom Jesus</td><td>35–44 anos</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>14</td><td>👩 Individual</td><td>Bom Jesus</td><td>45–54 anos</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>15</td><td>👩 Individual</td><td>Bom Jesus</td><td>18–24 anos</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>16</td><td>👩 Individual</td><td>Recanto do Lago</td><td>25–34 anos</td><td><span class="badge badge-sim">Sim</span></td><td>7</td><td><span class="badge badge-alta">Alta</span></td></tr>
+        <tr><td>17</td><td>👩 Individual</td><td>Recanto do Lago</td><td>35–44 anos</td><td><span class="badge badge-sim">Em invest.</span></td><td>8</td><td><span class="badge badge-alta">Alta</span></td></tr>
+        <tr><td>18</td><td>👩 Individual</td><td>Recanto do Lago</td><td>45–54 anos</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>19</td><td>👩 Individual</td><td>Recanto do Lago</td><td>55 anos ou +</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>20</td><td>👩 Individual</td><td>Recanto do Lago</td><td>18–24 anos</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>21</td><td>🏢 ctor4.com</td><td>Teixeira de Freitas</td><td>35–44 anos</td><td><span class="badge badge-sim">Sim</span></td><td>9</td><td><span class="badge badge-alta">Alta</span></td></tr>
+        <tr><td>22</td><td>🏢 ctor4.com</td><td>Teixeira de Freitas</td><td>25–34 anos</td><td><span class="badge badge-sim">Em invest.</span></td><td>7</td><td><span class="badge badge-alta">Alta</span></td></tr>
+        <tr><td>23</td><td>🏢 ctor4.com</td><td>Teixeira de Freitas</td><td>18–24 anos</td><td><span class="badge badge-sim">Em invest.</span></td><td>8</td><td><span class="badge badge-alta">Alta</span></td></tr>
+        <tr><td>24</td><td>🏢 ctor4.com</td><td>Teixeira de Freitas</td><td>45–54 anos</td><td><span class="badge badge-sim">Em invest.</span></td><td>9</td><td><span class="badge badge-alta">Alta</span></td></tr>
+        <tr><td>25</td><td>🏢 ctor4.com</td><td>Teixeira de Freitas</td><td>25–34 anos</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>26</td><td>🏢 ctor4.com</td><td>Teixeira de Freitas</td><td>35–44 anos</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>27</td><td>🏢 ctor4.com</td><td>Teixeira de Freitas</td><td>18–24 anos</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>28</td><td>🏢 ctor4.com</td><td>Teixeira de Freitas</td><td>45–54 anos</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>29</td><td>🏢 ctor4.com</td><td>Teixeira de Freitas</td><td>25–34 anos</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+        <tr><td>30</td><td>🏢 ctor4.com</td><td>Teixeira de Freitas</td><td>35–44 anos</td><td><span class="badge badge-nao">Não</span></td><td>2</td><td><span class="badge badge-baixa">Baixa</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<footer>⚗️ Dados 100% fictícios · Endometriômetro FASE 2C · Lote TESTE-2026-10 · 05/10/2026</footer>
+
+<script>
+  function showTab(name, btn) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+  }
+</script>
+</body>
+</html>

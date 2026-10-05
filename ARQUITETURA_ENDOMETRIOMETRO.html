@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentação de Arquitetura e Fluxogramas — ENDOMETRIÔMETRO</title>
+  
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Mermaid.js para renderização dos fluxogramas -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: 'neutral',
+        flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' }
+      });
+    });
+  </script>
+
+  <style>
+    :root {
+      --primary: #D65C6A;
+      --primary-dark: #9E3B46;
+      --secondary: #5C2228;
+      --bg-pale: #FAEDED;
+      --card-bg: #FFFFFF;
+      --border-color: #F4D2D5;
+      --text-main: #2C181A;
+      --text-muted: #6B4E52;
+      --code-bg: #1E1E2E;
+      --code-text: #CDD6F4;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-pale);
+      color: var(--text-main);
+      line-height: 1.6;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: linear-gradient(135deg, #FFFFFF 0%, #FDF5F6 100%);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 2.5rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 10px 30px -10px rgba(158, 59, 70, 0.08);
+      text-align: center;
+    }
+
+    header h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2.2rem;
+      color: var(--primary-dark);
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.5px;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 1rem;
+    }
+
+    .badge {
+      display: inline-block;
+      background-color: var(--border-color);
+      color: var(--primary-dark);
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 0.35rem 1rem;
+      border-radius: 50px;
+      margin-bottom: 1rem;
+    }
+
+    .card-section {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+    }
+
+    h2 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.5rem;
+      color: var(--secondary);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--bg-pale);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    h3 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.2rem;
+      color: var(--primary-dark);
+      margin: 1.5rem 0 0.5rem 0;
+    }
+
+    p, li {
+      font-size: 0.95rem;
+      color: var(--text-main);
+    }
+
+    ul, ol {
+      margin-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .diagram-container {
+      background-color: #FFFFFF;
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      overflow-x: auto;
+      display: flex;
+      justify-content: center;
+    }
+
+    pre {
+      background-color: var(--code-bg);
+      color: var(--code-text);
+      font-family: 'Fira Code', monospace;
+      font-size: 0.85rem;
+      padding: 1.25rem;
+      border-radius: 14px;
+      overflow-x: auto;
+      margin: 1rem 0;
+      line-height: 1.5;
+    }
+
+    .info-box {
+      background-color: #FDF5F6;
+      border-left: 4px solid var(--primary);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem 0;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border-color);
+      margin-top: 3rem;
+    }
+
+    @media print {
+      body { background-color: #FFFFFF; padding: 0; }
+      .card-section { box-shadow: none; border: 1px solid #CCCCCC; page-break-inside: avoid; }
+      header { border: 1px solid #CCCCCC; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <header>
+      <span class="badge">Documentação Técnica de Engenharia de Software</span>
+      <h1>ENDOMETRIÔMETRO — Arquitetura e Fluxogramas</h1>
+      <p>Mapeamento de Processos, Diagramas Mermaid, Segurança LGPD, K-Anonymity e Modelo de Tabelas JSON</p>
+    </header>
+
+    <!-- SEÇÃO 1: FLUXO PARTICIPANTE INDIVIDUAL -->
+    <div class="card-section">
+      <h2>1. Processo do Participante Individual</h2>
+      <p>Fluxo completo do participante: autenticação, consentimento LGPD, preenchimento do questionário em etapas, cálculo do algoritmo de triagem e gravação atômica.</p>
+      
+      <div class="diagram-container">
+        <div class="mermaid">
+          flowchart TD
+              A["Início: Acesso ao Endometriômetro"] --> B{"Já possui cadastro?"}
+              
+              B -- Não --> C["Tela de Cadastro (Login.tsx)"]
+              C --> D["Preenche: Nome, E-mail, Senha"]
+              D --> E["Aceite dos Termos de Consentimento LGPD"]
+              E --> F["Criar Conta no Supabase Auth"]
+              F --> G["Perfil criado em public.profiles (role: 'participante')"]
+              
+              B -- Sim --> H["Tela de Login (Login.tsx)"]
+              H --> I["Autentica via Supabase Auth (signInWithPassword)"]
+              I --> J["Token JWT retornado"]
+
+              G --> K["Apresentação da Pesquisa (/pesquisa)"]
+              J --> K
+              
+              K --> L["Etapa 1: Dados Demográficos (Idade, Localidade)"]
+              L --> M["Etapa 2: Sintomas Diagnósticos e Intensidade da Dor (0-10)"]
+              M --> N["Etapa 3: Impacto no Trabalho (Horas de Ausência/Atestados)"]
+              N --> O["Etapa 4: Algoritmo de Triagem (Exibe Probabilidade Clinica)"]
+              
+              O --> P["Gravação via RPC submit_survey_response(...)"]
+              P --> Q{"Verifica Restrição Única (user_id + survey_id)"}
+              
+              Q -- Já respondeu --> R["Bloqueia Reenvio (Idempotência)"]
+              Q -- Primeira resposta --> S["Insere em public.survey_responses (status: 'concluida')"]
+              
+              S --> T["Card de Conclusão Oficial (ANEXO A5)"]
+              T --> U["Disparo de E-mail de Agradecimento (ANEXO A6)"]
+        </div>
+      </div>
+    </div>
+
+    <!-- SEÇÃO 2: FLUXO DA EMPRESA / INSTITUIÇÃO -->
+    <div class="card-section">
+      <h2>2. Processo da Empresa e Alinhamento de Colaboradoras</h2>
+      <p>Fluxo da instituição: cadastro da empresa, geração de pesquisas com token não previsível de 128-bits, distribuição de links exclusivos e atualização dos gráficos com barreira de privacidade K-Anonymity (>= 5 respostas).</p>
+
+      <div class="diagram-container">
+        <div class="mermaid">
+          flowchart TD
+              A1["Cadastro da Instituição (Login.tsx / Pesquisa.tsx)"] --> B1["Preenche: Nome Empresa, CNPJ, E-mail RH, Setor"]
+              B1 --> C1["Supabase Auth + Registros em public.companies e public.profiles (role: 'instituicao')"]
+              C1 --> D1["Painel Corporativo Protegido (/banco-de-dados com ProtectedRoute)"]
+              
+              D1 --> E1["Criar Nova Pesquisa Institucional"]
+              E1 --> F1["Geração de Token Aleatório de 128-bits (public.surveys.token)"]
+              F1 --> G1["Link Exclusivo: /pesquisa?token=TOKEN_128_BITS"]
+              
+              G1 --> H1["Distribuição às Colaboradoras via WhatsApp / E-mail"]
+              H1 --> I1["Colaboradora abre o link no Celular ou Desktop"]
+              I1 --> J1["Respostas vinculadas a survey_id e company_id da empresa"]
+              
+              J1 --> K1["Painel Executivo solicita atualização das métricas"]
+              K1 --> L1["Executa RPC get_survey_metrics_aggregated(survey_id, company_id)"]
+              L1 --> M1{"Respostas Concluídas >= 5?"}
+              
+              M1 -- Não (<5) --> N1["Barreira K-Anonymity LGPD: Exibe aviso e oculta estatísticas"]
+              M1 -- Sim (>=5) --> O1["Retorna Agregados (Percentuais de Risco e Horas Afetadas)"]
+              O1 --> P1["Gráficos do Recharts Atualizados em Tempo Real"]
+              P1 --> Q1["Botão Gerar Relatório em PDF Protegido (ANEXO A9)"]
+        </div>
+      </div>
+
+      <div class="info-box">
+        <strong>🔒 Regra de Privacidade e K-Anonymity:</strong> Para impedir a reidentificação de colaboradoras em equipes pequenas, o backend calcula os recortes estatísticos somente quando o total de respostas concluídas atinge no mínimo 5 participantes.
+      </div>
+    </div>
+
+    <!-- SEÇÃO 3: ESTRUTURA DAS TABELAS NO MODELO JSON -->
+    <div class="card-section">
+      <h2>3. Estrutura das Tabelas do Banco de Dados (Modelo JSON)</h2>
+      
+      <h3>3.1 Tabela `public.profiles`</h3>
+      <p>Armazena a identidade dos usuários e o papel atribuído (<code>participante</code>, <code>instituicao</code>, <code>admin</code>).</p>
+      <pre><code>{
+  "id": "a3b1c2d3-e4f5-4678-9012-3456789abcde",
+  "email": "rh@empresaexemplo.com.br",
+  "full_name": "Gestor de Recursos Humanos",
+  "role": "instituicao",
+  "company_id": "7f8e9d0c-1b2a-4345-8901-23456789ffff",
+  "created_at": "2026-09-30T15:00:00.000Z"
+}</code></pre>
+
+      <h3>3.2 Tabela `public.companies`</h3>
+      <p>Armazena as empresas e instituições cadastradas na plataforma.</p>
+      <pre><code>{
+  "id": "7f8e9d0c-1b2a-4345-8901-23456789ffff",
+  "name": "Empresa Exemplo S.A.",
+  "cnpj_or_identifier": "12.345.678/0001-90",
+  "contact_email": "rh@empresaexemplo.com.br",
+  "code_slug": "Empresa_Exemplo_SA",
+  "created_at": "2026-09-30T15:00:00.000Z"
+}</code></pre>
+
+      <h3>3.3 Tabela `public.surveys`</h3>
+      <p>Armazena as pesquisas criadas com tokens não previsíveis de 128-bits para compartilhamento seguro.</p>
+      <pre><code>{
+  "id": "11223344-5566-7788-9900-aabbccddeeff",
+  "company_id": "7f8e9d0c-1b2a-4345-8901-23456789ffff",
+  "title": "Pesquisa de Saúde Feminina 2026",
+  "description": "Questionário institucional de triagem para colaboradoras",
+  "token": "e4d9c8b7a6f5e4d3c2b1a09876543210e4d9c8b7a6f5e4d3c2b1a09876543210",
+  "status": "ativa",
+  "created_at": "2026-09-30T15:05:00.000Z"
+}</code></pre>
+
+      <h3>3.4 Tabela `public.survey_responses`</h3>
+      <p>Armazena o payload JSONB completo das respostas enviadas pelas participantes com preservação de sigilo e status da resposta.</p>
+      <pre><code>{
+  "id": "88776655-4433-2211-00ff-eeddccbbaa99",
+  "survey_id": "11223344-5566-7788-9900-aabbccddeeff",
+  "company_id": "7f8e9d0c-1b2a-4345-8901-23456789ffff",
+  "user_id": "99887766-5544-3322-1100-001122334455",
+  "status": "concluida",
+  "responses": {
+    "idade": "25 - 34",
+    "localidade": "São Paulo / SP",
+    "email": "colaboradora@empresaexemplo.com.br",
+    "empresa": "Empresa Exemplo S.A.",
+    "diagnostico": "Em investigação",
+    "sintomas": [
+      "colica_intensa",
+      "dor_relacao",
+      "dor_pelvica_cronica",
+      "fadiga_extrema"
+    ],
+    "intensidadeDor": 8,
+    "trabalha": "Sim",
+    "impactoTrabalho": "Alto",
+    "horasAusencia": "18",
+    "diasAtestado": "3",
+    "resultado": "Alta Probabilidade de Endometriose"
+  },
+  "created_at": "2026-09-30T15:15:00.000Z",
+  "completed_at": "2026-09-30T15:18:20.000Z"
+}</code></pre>
+    </div>
+
+    <footer>
+      <p>Plataforma ENDOMETRIÔMETRO — Todos os direitos reservados. Documento gerado automaticamente pela suíte de manutenção.</p>
+    </footer>
+
+  </div>
+
+</body>
+</html>

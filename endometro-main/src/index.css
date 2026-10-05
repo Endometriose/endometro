@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Nunito:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --background: 352 100% 97%;
+    --foreground: 349 40% 20%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 349 40% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 349 40% 20%;
+
+    --primary: 349 68% 69%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 352 100% 90%;
+    --secondary-foreground: 349 40% 25%;
+
+    --muted: 352 80% 93%;
+    --muted-foreground: 349 30% 50%;
+
+    --accent: 349 68% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 351 95% 88%;
+    --input: 351 95% 88%;
+    --ring: 349 68% 69%;
+
+    --radius: 0.75rem;
+
+    --rose-blush: 352 100% 90%;
+    --rose-pale: 351 95% 85%;
+    --rose-light: 350 90% 79%;
+    --rose-medium: 349 78% 74%;
+    --rose-dark: 349 68% 69%;
+    --pink-soft: 350 90% 79%;
+
+    --sidebar-background: 352 100% 97%;
+    --sidebar-foreground: 349 40% 20%;
+    --sidebar-primary: 349 68% 69%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 352 100% 90%;
+    --sidebar-accent-foreground: 349 40% 25%;
+    --sidebar-border: 351 95% 88%;
+    --sidebar-ring: 349 68% 69%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+}
