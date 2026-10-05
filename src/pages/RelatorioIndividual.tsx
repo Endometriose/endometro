@@ -1,20 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { AlertCircle, Download, FileText, ArrowRight, Activity, CalendarDays, Brain, Loader2 } from "lucide-react";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import { gerarRelatorioIndividual } from "@/lib/relatorio-pdf/gerarPDF";
 
 const RelatorioIndividual = () => {
   const navigate = useNavigate();
-  const reportRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const [userData, setUserData] = useState<any>(null);
-  const [userEmail, setUserEmail] = useState("");
 
   useEffect(() => {
     const fetchLastResponse = async () => {
@@ -24,8 +21,6 @@ const RelatorioIndividual = () => {
           navigate("/login");
           return;
         }
-
-        setUserEmail(user.email || "");
 
         // Busca a última resposta da participante
         const { data, error } = await supabase
@@ -53,40 +48,31 @@ const RelatorioIndividual = () => {
     fetchLastResponse();
   }, [navigate]);
 
+  const resultado = userData?.resultado || "";
+  const sintomas: string[] = userData?.sintomas || [];
+  const intensidadeDor = userData?.intensidadeDor ?? userData?.intensidade_dor ?? "—";
+  const horasAusencia = userData?.horasAusencia ?? userData?.horas_ausencia ?? 0;
+  const diasAtestado = userData?.diasAtestado ?? userData?.dias_atestado ?? 0;
+
   const handleBaixarPdf = async () => {
-    if (!reportRef.current) return;
     setGerandoPdf(true);
     try {
-      const canvas = await html2canvas(reportRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#fff",
-        logging: false,
+      await gerarRelatorioIndividual({
+        resultado: resultado,
+        sintomas: sintomas,
+        intensidadeDor: intensidadeDor,
+        horasAusencia: horasAusencia,
+        diasAtestado: diasAtestado,
+        trabalha: userData?.trabalha,
+        impactoTrabalho: userData?.impactoTrabalho,
+        diagnostico: userData?.diagnostico,
+        idade: userData?.idade,
+        cidade: userData?.cidade,
+        bairro: userData?.bairro,
+        uf: userData?.uf,
+        dataEmissao: new Date().toLocaleDateString("pt-BR"),
+        temDadoTeste: false,
       });
-
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const ratio = pdfWidth / imgWidth;
-      const scaledHeight = imgHeight * ratio;
-
-      let yPosition = 0;
-      while (yPosition < scaledHeight) {
-        if (yPosition > 0) pdf.addPage();
-        pdf.addImage(
-          imgData, "PNG",
-          0, -yPosition,
-          pdfWidth, scaledHeight
-        );
-        yPosition += pdfHeight;
-      }
-
-      const dataEmissao = new Date().toLocaleDateString("pt-BR").replace(/\//g, "-");
-      pdf.save(`Relatorio_Individual_Endometriometro_${dataEmissao}.pdf`);
     } catch (err) {
       console.error("Erro ao gerar PDF:", err);
     } finally {
@@ -112,12 +98,7 @@ const RelatorioIndividual = () => {
     );
   }
 
-  const resultado = userData?.resultado || "";
   const estilos = getResultadoStyle(resultado);
-  const sintomas: string[] = userData?.sintomas || [];
-  const intensidadeDor = userData?.intensidadeDor ?? userData?.intensidade_dor ?? "—";
-  const horasAusencia = userData?.horasAusencia ?? userData?.horas_ausencia ?? 0;
-  const diasAtestado = userData?.diasAtestado ?? userData?.dias_atestado ?? 0;
   const localidade = userData?.localidade || [userData?.cidade, userData?.bairro, userData?.uf].filter(Boolean).join(", ") || "—";
 
   return (

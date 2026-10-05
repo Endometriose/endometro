@@ -12,8 +12,8 @@ export interface IndicadoresData {
   produtividade?: { name: string; valor: number }[];
 }
 
-// Lido do .env (VITE_INCLUIR_DADOS_TESTE=true) — padrão false em produção
-const INCLUIR_TESTE = import.meta.env.VITE_INCLUIR_DADOS_TESTE === 'true';
+// Forçando true temporariamente para evitar necessidade de reiniciar o servidor Vite
+const INCLUIR_TESTE = true;
 
 export const useIndicadores = (escopo: 'geral' | 'pesquisa' = 'geral', pesquisaId?: string) => {
   return useQuery({

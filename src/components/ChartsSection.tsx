@@ -18,14 +18,35 @@ const PALETTE = {
   nude:   "#F0E4E0",
 };
 
+const COLORS_ROSE = ["#E8828F", "#F0A6B1", "#F7C5CC", "#FDE2E6"];
+const COLORS_BARS = ["#E06D7D", "#E8828F", "#F09CA8", "#F5B6C0", "#F9CBD2", "#FDE2E6"];
+
+const SINTOMAS_MAP: Record<string, string> = {
+  "colica_intensa": "Cólica incapacitante",
+  "dor_relacao": "Dor na relação sexual",
+  "dor_pelvica_cronica": "Dor pélvica crônica",
+  "dor_intestino": "Dor intestinal",
+  "dor_xixi": "Dor ao urinar",
+  "historico_familiar": "Histórico familiar",
+  "dificuldade_engravidar": "Dif. p/ engravidar",
+  "dor_lombar_pernas": "Dor lombar/pernas",
+  "uso_analgesicos": "Uso de analgésicos fortes",
+  "historico_cistos": "Histórico de cistos",
+  "fadiga_extrema": "Fadiga crônica",
+  "ansiedade_dor": "Ansiedade pela dor"
+};
+
 interface ChartsSectionProps {
   companyId?: string;
 }
+
+type ChartKey = 'prevalence' | 'symptoms' | 'productivity';
 
 const ChartsSection = ({ companyId }: ChartsSectionProps = {}) => {
   const escopo = companyId ? 'pesquisa' : 'geral';
   const { data, isLoading, isError, error, refetch, isRefetching } = useIndicadores(escopo, companyId);
   const [isAgeModalOpen, setIsAgeModalOpen] = useState(false);
+  const [activeChartKey, setActiveChartKey] = useState<ChartKey | null>(null);
 
   if (isError) {
     return (
@@ -47,19 +68,140 @@ const ChartsSection = ({ companyId }: ChartsSectionProps = {}) => {
 
   const chartDataIdade = data?.idade || [];
 
-  const GraficoIdadeBarras = ({ height = 200 }: { height?: number }) => (
-    <div style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={chartDataIdade} margin={{ top: 10, left: -10, right: 10, bottom: 30 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#fde4e8" vertical={false} />
-          <XAxis dataKey="name" tick={{ fontSize: 11, fill: PALETTE.dark }} angle={-30} textAnchor="end" interval={0} />
-          <YAxis tick={{ fontSize: 11, fill: PALETTE.dark }} />
-          <RechartsTooltip contentStyle={{ borderRadius: "10px", border: "none" }} formatter={(val) => [`${val} pessoas`, "Quantidade"]} />
-          <Bar dataKey="value" fill={PALETTE.medium} radius={[4, 4, 0, 0]} name="Participantes" />
-        </BarChart>
-      </ResponsiveContainer>
+  const renderInsufficientData = () => (
+    <div className="flex flex-col items-center justify-center h-full text-center p-6 border-2 border-dashed border-rose-200 rounded-xl bg-rose-50/50">
+      <AlertCircle className="w-8 h-8 text-rose-400 mb-3" />
+      <p className="text-sm font-medium text-rose-800">
+        Ainda não há respostas suficientes para exibir este indicador (mínimo de 5).
+      </p>
     </div>
   );
+
+  const renderPrevalenceChart = (isEnlarged = false) => {
+    if (!data?.suficiente) return renderInsufficientData();
+    const chartData = data.prevalencia || [];
+    const total = chartData.reduce((acc, curr) => acc + curr.value, 0);
+    const diag = chartData.find(d => d.name.toLowerCase().includes('diagnóstico formal'))?.value || 0;
+    const pct = total > 0 ? Math.round((diag / total) * 100) : 0;
+
+    return (
+      <div className="w-full h-full flex flex-col items-center">
+        <div className="flex-1 w-full min-h-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="50%"
+                innerRadius={isEnlarged ? "60%" : "60%"}
+                outerRadius={isEnlarged ? "80%" : "85%"}
+                dataKey="value"
+                stroke="none"
+              >
+                {chartData.map((d, i) => (
+                  <Cell key={i} fill={d.name.toLowerCase().includes('diagnóstico') ? PALETTE.dark : PALETTE.pale} />
+                ))}
+              </Pie>
+              <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central">
+                <tspan x="50%" dy="-0.2em" fontSize={isEnlarged ? "36" : "28"} fontWeight="bold" fill={PALETTE.dark}>
+                  {pct}%
+                </tspan>
+                <tspan x="50%" dy="1.5em" fontSize={isEnlarged ? "14" : "11"} fill={PALETTE.medium}>
+                  diagnóstico
+                </tspan>
+              </text>
+              <RechartsTooltip contentStyle={{ borderRadius: "10px", border: "none" }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex items-center justify-center gap-4 mt-1 shrink-0 pb-1">
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: PALETTE.dark }}></span>
+            <span className="text-[10px] sm:text-xs text-foreground">Com diagnóstico</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: PALETTE.pale }}></span>
+            <span className="text-[10px] sm:text-xs text-foreground">S/ diagnóstico</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSymptomsChart = (isEnlarged = false) => {
+    if (!data?.suficiente) return renderInsufficientData();
+    const chartData = (data.sintomas || []).map(s => ({
+      name: SINTOMAS_MAP[s.name] || s.name,
+      pct: Math.round((s.total / data.total_concluidas) * 100)
+    }));
+    return (
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={chartData} layout="vertical" margin={{ left: isEnlarged ? 130 : 100, right: 30 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f4d2d5" horizontal={false} />
+          <XAxis type="number" domain={[0, 100]} tick={{ fill: "#5c2228", fontSize: isEnlarged ? 13 : 11 }} unit="%" />
+          <YAxis type="category" dataKey="name" width={isEnlarged ? 180 : 140} tick={{ fill: "#5c2228", fontSize: isEnlarged ? 12 : 10 }} />
+          <RechartsTooltip contentStyle={{ borderRadius: '12px', border: 'none' }} formatter={(val) => [`${val}%`, 'Incidência']} />
+          <Bar dataKey="pct" radius={[0, 4, 4, 0]} barSize={isEnlarged ? 24 : 16} label={{ position: 'right', fill: PALETTE.dark, fontSize: isEnlarged ? 12 : 10, formatter: (val: number) => `${val}%` }}>
+            {chartData.map((_, i) => <Cell key={i} fill={PALETTE.medium} />)}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    );
+  };
+
+  const renderProductivityChart = (isEnlarged = false) => {
+    if (!data?.suficiente) return renderInsufficientData();
+    const chartData = data.produtividade || [];
+    return (
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={chartData} margin={{ top: 20, bottom: isEnlarged ? 20 : 40, left: 10, right: 10 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f4d2d5" vertical={false} />
+          <XAxis
+            dataKey="name"
+            tick={{ fill: "#5c2228", fontSize: isEnlarged ? 12 : 10 }}
+            interval={0}
+            angle={isEnlarged ? 0 : -15}
+            textAnchor={isEnlarged ? "middle" : "end"}
+          />
+          <YAxis tick={{ fill: "#5c2228", fontSize: isEnlarged ? 13 : 11 }} />
+          <RechartsTooltip contentStyle={{ borderRadius: '12px', border: 'none' }} formatter={(val) => [`${val}`, 'Média']} />
+          <Bar dataKey="valor" name="Média Reportada" radius={[8, 8, 0, 0]} barSize={isEnlarged ? 60 : 40} label={{ position: 'top', fill: PALETTE.dark, fontSize: isEnlarged ? 14 : 12, fontWeight: 'bold' }}>
+            {chartData.map((_, i) => <Cell key={i} fill={PALETTE.light} />)}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    );
+  };
+
+  const CHARTS_LIST = [
+    {
+      key: 'prevalence' as ChartKey,
+      title: 'Prevalência de Diagnóstico',
+      subtitle: 'Composição das Participantes',
+      description: 'Percentual de mulheres com diagnóstico formal de endometriose em comparação com as que não têm ou estão em investigação.',
+      render: (enlarged: boolean) => renderPrevalenceChart(enlarged)
+    },
+    {
+      key: 'symptoms' as ChartKey,
+      title: 'Frequência dos Sintomas (%)',
+      subtitle: 'Sinais Clínicos mais Frequentes',
+      description: 'Porcentagem de participantes que assinalaram cada sintoma ou situação clínica listada no formulário de triagem.',
+      render: (enlarged: boolean) => renderSymptomsChart(enlarged)
+    },
+    {
+      key: 'productivity' as ChartKey,
+      title: 'Impacto Médio no Trabalho',
+      subtitle: 'Presenteísmo vs Absenteísmo',
+      description: 'Média de horas mensais trabalhando com dor (Presenteísmo) e média de dias de atestado médico por dores no ano (Absenteísmo).',
+      render: (enlarged: boolean) => renderProductivityChart(enlarged)
+    },
+  ];
+
+  const currentSingleChart = CHARTS_LIST.find(c => c.key === activeChartKey);
+  const currentChartIndex = CHARTS_LIST.findIndex(c => c.key === activeChartKey);
+
+  const handlePrevChart = () => setActiveChartKey(CHARTS_LIST[currentChartIndex > 0 ? currentChartIndex - 1 : CHARTS_LIST.length - 1].key);
+  const handleNextChart = () => setActiveChartKey(CHARTS_LIST[currentChartIndex < CHARTS_LIST.length - 1 ? currentChartIndex + 1 : 0].key);
 
   return (
     <section id="graficos" className="py-20 px-4 bg-background pb-32">
@@ -88,18 +230,31 @@ const ChartsSection = ({ companyId }: ChartsSectionProps = {}) => {
             {/* 3 Gráficos principais */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {CHARTS_LIST.map((item) => (
-                <div key={item.key} onClick={() => setActiveChartKey(item.key)} className="bg-card rounded-2xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-rose-100 group relative flex flex-col h-[360px] cursor-pointer" title="Clique para expandir este gráfico na tela toda">
-                  <div className="flex justify-between items-start mb-3 pr-8"><h3 className="font-display text-base font-bold text-foreground leading-tight">{item.title}</h3></div>
-                  <button className="absolute top-4 right-4 p-2 rounded-full bg-rose-100/80 text-rose-dark group-hover:bg-primary group-hover:text-white transition-all shadow-sm"><Maximize2 className="w-4 h-4" /></button>
-                  <div className="flex-1 w-full relative pointer-events-none my-2">{item.render(false)}</div>
-                  <div className="pt-2 border-t border-rose-50 text-center"><span className="text-xs font-semibold text-primary group-hover:underline inline-flex items-center gap-1"><Maximize2 className="w-3 h-3" /> Clique para Expandir na Tela Toda</span></div>
+                <div key={item.key} onClick={() => setActiveChartKey(item.key)} className="bg-white rounded-2xl p-5 shadow-sm border border-rose-100 flex flex-col h-[340px] hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group relative">
+                  <div className="flex justify-between items-start mb-2 pr-8">
+                    <div>
+                      <h3 className="font-display text-sm md:text-base font-bold text-foreground leading-tight">{item.title}</h3>
+                      <p className="text-xs text-muted-foreground">{item.subtitle}</p>
+                    </div>
+                  </div>
+                  <button className="absolute top-4 right-4 p-2 rounded-full bg-rose-500/80 text-white group-hover:bg-primary transition-all shadow-sm">
+                    <Maximize2 className="w-4 h-4" />
+                  </button>
+                  <div className="flex-1 w-full relative pointer-events-none mb-2">
+                    {item.render(false)}
+                  </div>
+                  <div className="pt-2 text-center border-t border-rose-50/50 mt-1">
+                    <p className="text-[10px] text-muted-foreground italic mb-0">
+                      {item.key === 'prevalence' ? 'Valores referem-se à proporção da amostra.' : item.key === 'symptoms' ? 'Sintomas relatados não equivalem a diagnóstico.' : 'Médias baseadas nas respostas válidas.'}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>
 
-            {/* Distribuição por Faixa Etária — estilo moderno igual ao de empresa */
+            {/* Distribuição por Faixa Etária — estilo moderno igual ao de empresa */}
             {data?.suficiente && chartDataIdade.length > 0 && (
-              <div className="grid grid-cols-1 mb-16 max-w-2xl mx-auto">
+              <div className="mb-16 max-w-2xl mx-auto">
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-rose-100 hover:shadow-md transition-shadow group relative">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pr-10">
                     <div>
@@ -116,7 +271,17 @@ const ChartsSection = ({ companyId }: ChartsSectionProps = {}) => {
                     <Maximize2 className="w-4 h-4" />
                   </button>
 
-                  <GraficoIdadeBarras height={220} />
+                  <div style={{ height: 220 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartDataIdade} margin={{ top: 10, left: -10, right: 10, bottom: 30 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#fde4e8" vertical={false} />
+                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: PALETTE.dark }} angle={-30} textAnchor="end" interval={0} />
+                        <YAxis tick={{ fontSize: 11, fill: PALETTE.dark }} />
+                        <RechartsTooltip contentStyle={{ borderRadius: "10px", border: "none" }} formatter={(val) => [`${val} pessoas`, "Quantidade"]} />
+                        <Bar dataKey="value" fill={PALETTE.medium} radius={[4, 4, 0, 0]} name="Participantes" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </div>
             )}
@@ -190,7 +355,17 @@ const ChartsSection = ({ companyId }: ChartsSectionProps = {}) => {
                   </div>
                 </DialogHeader>
                 <div className="flex-1 w-full my-4 bg-pink-soft/20 rounded-2xl p-4 md:p-6 border border-rose-100 flex items-center justify-center min-h-0">
-                  <div className="w-full h-full"><GraficoIdadeBarras height={undefined} /></div>
+                  <div className="w-full h-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartDataIdade} margin={{ top: 10, left: -10, right: 10, bottom: 30 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#fde4e8" vertical={false} />
+                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: PALETTE.dark }} angle={-30} textAnchor="end" interval={0} />
+                        <YAxis tick={{ fontSize: 11, fill: PALETTE.dark }} />
+                        <RechartsTooltip contentStyle={{ borderRadius: "10px", border: "none" }} formatter={(val) => [`${val} pessoas`, "Quantidade"]} />
+                        <Bar dataKey="value" fill={PALETTE.medium} radius={[4, 4, 0, 0]} name="Participantes" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
                 <div className="shrink-0 pt-3 border-t border-rose-100 flex justify-end">
                   <Button onClick={() => setIsAgeModalOpen(false)} className="bg-secondary hover:bg-secondary/90 text-white font-bold rounded-xl px-6">Fechar</Button>

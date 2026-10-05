@@ -11,9 +11,10 @@ import { toast } from "sonner";
 import { 
   ChevronRight, ChevronLeft, Check, Stethoscope, AlertTriangle, 
   CheckCircle2, FileText, ArrowRight, Building2, Link2, Copy,
-  Mail, Eye, EyeOff
+  Mail, Eye, EyeOff, Download, Loader2
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { gerarRelatorioIndividual } from "@/lib/relatorio-pdf/gerarPDF";
 
 const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG",
   "PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
@@ -78,6 +79,7 @@ const Pesquisa = () => {
   const [diasAtestado, setDiasAtestado] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [concluido, setConcluido] = useState(false);
+  const [gerandoPdfConclusao, setGerandoPdfConclusao] = useState(false);
   const [statusEmail, setStatusEmail] = useState<"nao_enviado" | "enviado" | "pendente_configuracao">("nao_enviado");
 
   // Estados da Área da Empresa (RH)
@@ -728,7 +730,52 @@ const Pesquisa = () => {
                       </div>
                     )}
 
-                    <div className="pt-6">
+                    {/* BOTÃO PDF PESSOAL — único momento seguro (dados em memória, antes de fechar) */}
+                    <div className="bg-rose-50 border border-rose-200 rounded-2xl p-5 max-w-md mx-auto text-left">
+                      <div className="flex items-center gap-2 mb-2">
+                        <FileText className="w-5 h-5 text-primary" />
+                        <p className="font-bold text-foreground text-sm">Baixe seu Resumo Pessoal em PDF</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Gerado a partir das respostas que você acabou de enviar. Não contém dados pessoais identificáveis.
+                      </p>
+                      <Button
+                        type="button"
+                        disabled={gerandoPdfConclusao}
+                        onClick={async () => {
+                          setGerandoPdfConclusao(true);
+                          try {
+                            const res = calcularResultado();
+                            await gerarRelatorioIndividual({
+                              resultado: res.nivel,
+                              sintomas: sintomasSelecionados,
+                              intensidadeDor: intensidadeDor,
+                              horasAusencia: horasAusencia || 0,
+                              diasAtestado: diasAtestado || 0,
+                              trabalha: trabalha,
+                              impactoTrabalho: impactoTrabalho,
+                              diagnostico: diagnostico,
+                              idade: idade,
+                              cidade: cidade,
+                              bairro: bairro,
+                              uf: uf,
+                              dataEmissao: new Date().toLocaleDateString("pt-BR"),
+                              temDadoTeste: false,
+                            });
+                          } catch (e) {
+                            toast.error("Erro ao gerar PDF.");
+                          } finally {
+                            setGerandoPdfConclusao(false);
+                          }
+                        }}
+                        className="w-full bg-primary hover:bg-rose-dark text-white font-bold rounded-xl gap-2"
+                      >
+                        {gerandoPdfConclusao ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                        {gerandoPdfConclusao ? "Gerando PDF..." : "Baixar meu Resumo em PDF"}
+                      </Button>
+                    </div>
+
+                    <div className="pt-2">
                       <Button
                         type="button"
                         onClick={() => navigate("/")}

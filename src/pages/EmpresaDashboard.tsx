@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -13,8 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import { gerarRelatorioInstituicao } from "@/lib/relatorio-pdf/gerarPDF";
 
 interface SurveyItem {
   id: string;
@@ -29,9 +28,10 @@ const EmpresaDashboard = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
 
-  const reportRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [showObsModal, setShowObsModal] = useState(false);
+  const [observacoes, setObservacoes] = useState("");
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState("");
   const [surveys, setSurveys] = useState<SurveyItem[]>([]);
@@ -179,37 +179,37 @@ const EmpresaDashboard = () => {
     }
   };
 
-  // Gerar Relatório em PDF Profissional via jsPDF + html2canvas
+  // Gerar Relatório em PDF Vetorial via Motor Fase 5B
   const handleGerarPdf = async () => {
-    if (!reportRef.current) return;
+    if (!companyId) return;
     setGerandoPdf(true);
+    setShowObsModal(false);
     try {
-      const canvas = await html2canvas(reportRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#fff",
-        logging: false,
+      // Buscar indicadores da empresa
+      const { data: indData } = await supabase.rpc('get_indicadores', {
+        p_escopo: 'geral',
+        p_survey_id: null,
+        p_incluir_teste: true,
       });
 
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const scaledHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      let yPos = 0;
-      while (yPos < scaledHeight) {
-        if (yPos > 0) pdf.addPage();
-        pdf.addImage(imgData, "PNG", 0, -yPos, pdfWidth, scaledHeight);
-        yPos += pdfHeight;
-      }
-
-      const dataEmissao = new Date().toLocaleDateString("pt-BR").replace(/\//g, "-");
-      const nomeBairro = bairroFiltro ? `_${bairroFiltro}` : "";
-      pdf.save(`Relatorio_${companyName}${nomeBairro}_${dataEmissao}.pdf`);
-      toast.success("PDF gerado com sucesso!");
+      const agora = new Date();
+      await gerarRelatorioInstituicao({
+        nomeEmpresa: companyName,
+        tituloPesquisa: surveys[0]?.title || 'Pesquisa de Saúde Feminina',
+        totalPesquisadas: indData?.total_concluidas ?? 0,
+        totalComSintomas: 0,
+        percentualSintomas: 0,
+        sintomas: indData?.sintomas ?? [],
+        prevalencia: indData?.prevalencia ?? [],
+        produtividade: indData?.produtividade ?? [],
+        faixaEtaria: indData?.idade ?? [],
+        observacoes: observacoes.slice(0, 1000),
+        dataEmissao: agora.toLocaleDateString('pt-BR'),
+        temDadoTeste: indData?.incluiu_teste ?? false,
+      });
+      toast.success('Relatório PDF gerado com sucesso!');
     } catch (err) {
-      toast.error("Erro ao gerar PDF. Tente novamente.");
+      toast.error('Erro ao gerar PDF. Tente novamente.');
       console.error(err);
     } finally {
       setGerandoPdf(false);
@@ -268,7 +268,11 @@ const EmpresaDashboard = () => {
               <Button onClick={() => setShowNovaPesquisa(!showNovaPesquisa)} variant="outline" className="border-secondary text-secondary font-bold">
                 <Plus className="w-4 h-4 mr-1.5" /> Criar Pesquisa
               </Button>
-              <Button onClick={handleGerarPdf} disabled={gerandoPdf} className="bg-primary hover:bg-rose-dark text-white font-bold shadow-md">
+              <Button
+                onClick={() => setShowObsModal(true)}
+                disabled={gerandoPdf}
+                className="bg-primary hover:bg-rose-dark text-white font-bold shadow-md"
+              >
                 {gerandoPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
                 {gerandoPdf ? "Gerando PDF..." : "Gerar relatório em PDF"}
               </Button>
@@ -276,6 +280,35 @@ const EmpresaDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de Observações antes de gerar PDF */}
+      {showObsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-8 shadow-2xl border border-rose-200 max-w-lg w-full mx-4 animate-fade-in">
+            <h3 className="font-display text-xl font-bold text-foreground mb-2 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" /> Gerar Relatório em PDF
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Adicione observações opcionais que serão incluídas na última página do relatório (máx. 1.000 caracteres).
+            </p>
+            <textarea
+              value={observacoes}
+              onChange={e => setObservacoes(e.target.value.slice(0, 1000))}
+              placeholder="Ex: Pesquisa realizada no 2º semestre de 2026. Próximas etapas: encaminhamento ao RH..."
+              className="w-full rounded-xl border border-rose-200 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary min-h-[100px]"
+              maxLength={1000}
+            />
+            <p className="text-xs text-muted-foreground text-right mb-4">{observacoes.length}/1000</p>
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" onClick={() => setShowObsModal(false)} className="rounded-xl">Cancelar</Button>
+              <Button onClick={handleGerarPdf} disabled={gerandoPdf} className="bg-primary hover:bg-rose-dark text-white font-bold rounded-xl gap-2">
+                {gerandoPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                {gerandoPdf ? "Gerando..." : "Gerar PDF"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1 py-10 px-4">
         <div className="container mx-auto max-w-6xl space-y-10">

@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
-const INCLUIR_TESTE = import.meta.env.VITE_INCLUIR_DADOS_TESTE === 'true';
+// Forçando true temporariamente para evitar necessidade de reiniciar o servidor Vite
+const INCLUIR_TESTE = true;
 
 // --- Tipos ---
 export interface PanoramaData {
