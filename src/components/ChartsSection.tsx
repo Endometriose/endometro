@@ -204,7 +204,7 @@ const ChartsSection = ({ companyId }: ChartsSectionProps = {}) => {
   const handleNextChart = () => setActiveChartKey(CHARTS_LIST[currentChartIndex < CHARTS_LIST.length - 1 ? currentChartIndex + 1 : 0].key);
 
   return (
-    <section id="graficos" className="py-20 px-4 bg-background pb-32">
+    <section id="graficos" className="pt-24 md:pt-32 pb-32 px-4 bg-background scroll-mt-20">
       <div className="container mx-auto max-w-6xl">
         
         {/* Cabeçalho da Seção */}

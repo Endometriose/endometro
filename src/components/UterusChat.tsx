@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Send, Sparkles, HelpCircle, Minus, Info, ChevronDown, ChevronUp, BarChart2, ShieldCheck, Building2 } from "lucide-react";
+import { X, Send, Sparkles, HelpCircle, Minus, Maximize, Info, ChevronDown, ChevronUp, BarChart2, ShieldCheck, Building2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Link } from "react-router-dom";
 
@@ -214,6 +214,33 @@ const UterusChat = () => {
 
     setIsLoading(true);
 
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMsg }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.text) {
+          const aiMsg: ChatMessage = { 
+            id: Date.now().toString(), 
+            isAi: true, 
+            text: data.text,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          };
+          setMessages(prev => [...prev, aiMsg]);
+          setIsLoading(false);
+          if (userId) await saveMessage(data.text, true);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("Fallback para regras educativas locais do Endozinho:", e);
+    }
+
+    // Fallback garantido usando respostas educativas estruturadas
     setTimeout(async () => {
       const aiResponseText = generateAIResponse(userMsg, updatedMessages);
       const aiMsg: ChatMessage = { 
@@ -227,7 +254,7 @@ const UterusChat = () => {
       setIsLoading(false);
 
       if (userId) await saveMessage(aiResponseText, true);
-    }, 1200); // Pausa realista para resposta
+    }, 600);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

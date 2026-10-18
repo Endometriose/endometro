@@ -58,6 +58,40 @@ export interface DadosInstituicao {
   temDadoTeste?: boolean;
 }
 
+export interface ColaboradoraRegistro {
+  id: string;
+  nome: string;
+  email: string;
+  idade?: string;
+  diagnosticoPrevio?: string;
+  resultado: string;
+  nivelProbabilidade: "Alto" | "Médio" | "Moderado" | "Baixo";
+  intensidadeDor?: number | string;
+  sintomas?: string[];
+  impactoTrabalho?: string;
+  horasAusencia?: number | string;
+  diasAtestado?: number | string;
+  dataResposta?: string;
+}
+
+export interface DadosRelatorioConsolidadoEmpresa {
+  nomeEmpresa: string;
+  cnpj?: string;
+  setor?: string;
+  responsavelRh?: string;
+  emailContato?: string;
+  dataEmissao?: string;
+  totalMulheresPesquisadas: number;
+  totalPossibilidadeEndometriose: number; // Alta + Moderada
+  percentualPossibilidade: number;
+  totalAltaProbabilidade: number;
+  totalModeradaProbabilidade: number;
+  totalBaixaProbabilidade: number;
+  colaboradoras: ColaboradoraRegistro[];
+  observacaoGestaoPessoas?: string;
+  temDadoTeste?: boolean;
+}
+
 // ─── Helpers de renderização ──────────────────────────────────────────────────
 const A4 = { w: 210, h: 297 };
 const MARGIN = 20;
@@ -588,4 +622,280 @@ export async function gerarRelatorioIndividual(dados: DadosIndividuais): Promise
 
   const nomeArq = `relatorio-individual-endometriometro-${dataStr.replace(/\//g, "-")}.pdf`;
   doc.save(nomeArq);
+}
+
+// ─── R4: Relatório Consolidado de Colaboradoras para Empresas ───────────────────
+export async function gerarRelatorioConsolidadoEmpresa(dados: DadosRelatorioConsolidadoEmpresa): Promise<void> {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const temTeste = dados.temDadoTeste ?? false;
+  const dataStr = dados.dataEmissao || new Date().toLocaleDateString("pt-BR");
+  
+  // Calcular número de páginas necessárias para tabela e fechamento
+  const itensPorPagina = 12;
+  const totalColabs = dados.colaboradoras.length;
+  const paginasTabela = Math.max(1, Math.ceil(totalColabs / itensPorPagina));
+  const TOTAL_PAG = paginasTabela + 1; // + 1 página para o parecer de Gestão de Pessoas e Fatores de Probabilidade
+
+  // ── PÁGINAS DA TABELA DE COLABORADORAS ─────────────────────────────────────
+  let indexColab = 0;
+  for (let pag = 1; pag <= paginasTabela; pag++) {
+    if (pag > 1) doc.addPage();
+    if (temTeste) marcaDaguaTeste(doc);
+
+    let y = cabecalho(
+      doc,
+      "Relatório Consolidado de Colaboradoras",
+      `${dados.nomeEmpresa} — Gestão de Pessoas & Saúde Corporativa`,
+      pag,
+      TOTAL_PAG,
+      temTeste
+    );
+
+    // Se for a primeira página, exibe os cards de métricas
+    if (pag === 1) {
+      // Sub-cabeçalho com CNPJ e Setor
+      setColor(doc, CORES.cinzaTexto, "text");
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      const infoEmpresa = [
+        dados.cnpj ? `CNPJ: ${dados.cnpj}` : null,
+        dados.setor ? `Setor: ${dados.setor}` : null,
+        dados.responsavelRh ? `Responsável RH: ${dados.responsavelRh}` : null,
+        `Data de Emissão: ${dataStr}`,
+      ].filter(Boolean).join("  •  ");
+      doc.text(infoEmpresa, MARGIN, y);
+      y += 5;
+
+      // 4 Cards de Métricas
+      const cW = (CONTENT_W - 9) / 4;
+      cardMetrica(doc, MARGIN, y, cW, "Mulheres Pesquisadas", dados.totalMulheresPesquisadas, "Total na empresa");
+      cardMetrica(doc, MARGIN + cW + 3, y, cW, "Possibilidade Endom.", dados.totalPossibilidadeEndometriose, `${dados.percentualPossibilidade}% do grupo`);
+      cardMetrica(doc, MARGIN + (cW + 3) * 2, y, cW, "Alta Probabilidade", dados.totalAltaProbabilidade, "Casos prioritários");
+      cardMetrica(doc, MARGIN + (cW + 3) * 3, y, cW, "Moderada / Baixa", `${dados.totalModeradaProbabilidade} / ${dados.totalBaixaProbabilidade}`, "Investigação/rotina");
+      y += 30;
+    }
+
+    // Título da Tabela
+    setColor(doc, CORES.preto, "text");
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Lista de Colaboradoras Pesquisadas (Página ${pag} de ${paginasTabela})`, MARGIN, y);
+    y += 5;
+
+    // Cabeçalho da Tabela
+    const colNomeW = 44;
+    const colEmailW = 46;
+    const colDiagW = 54;
+    const colImpW = 26;
+
+    setColor(doc, CORES.vinho, "fill");
+    doc.roundedRect(MARGIN, y, CONTENT_W, 8, 2, 2, "F");
+    setColor(doc, CORES.branco, "text");
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.text("NOME", MARGIN + 4, y + 5.5);
+    doc.text("E-MAIL", MARGIN + colNomeW + 4, y + 5.5);
+    doc.text("DIAGNÓSTICO (FATOR PROBAB.)", MARGIN + colNomeW + colEmailW + 4, y + 5.5);
+    doc.text("IMPACTO / AFAS.", MARGIN + colNomeW + colEmailW + colDiagW + 2, y + 5.5);
+    y += 9;
+
+    // Linhas de colaboradoras
+    const fimIndex = Math.min(indexColab + itensPorPagina, totalColabs);
+    if (totalColabs === 0) {
+      setColor(doc, CORES.cinzaClaro, "fill");
+      doc.roundedRect(MARGIN, y, CONTENT_W, 14, 2, 2, "F");
+      setColor(doc, CORES.cinzaTexto, "text");
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "italic");
+      doc.text("Nenhuma colaboradora registrada nesta pesquisa institucional até o momento.", A4.w / 2, y + 8, { align: "center" });
+      y += 18;
+    } else {
+      for (let i = indexColab; i < fimIndex; i++) {
+        const c = dados.colaboradoras[i];
+        const isPar = i % 2 === 0;
+
+        // Fundo zebrado
+        setColor(doc, isPar ? CORES.branco : CORES.cinzaClaro, "fill");
+        doc.rect(MARGIN, y, CONTENT_W, 9.5, "F");
+
+        // Borda inferior sutil
+        setColor(doc, CORES.palido, "stroke");
+        doc.setLineWidth(0.2);
+        doc.line(MARGIN, y + 9.5, MARGIN + CONTENT_W, y + 9.5);
+
+        // Nome
+        setColor(doc, CORES.preto, "text");
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        const nomeTruncado = c.nome.length > 22 ? c.nome.slice(0, 22) + "…" : c.nome;
+        doc.text(nomeTruncado, MARGIN + 4, y + 6);
+
+        // Email
+        setColor(doc, CORES.cinzaTexto, "text");
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "normal");
+        const emailTruncado = c.email.length > 26 ? c.email.slice(0, 26) + "…" : c.email;
+        doc.text(emailTruncado, MARGIN + colNomeW + 4, y + 6);
+
+        // Badge de Diagnóstico / Probabilidade
+        const nivel = c.nivelProbabilidade;
+        let badgeBg = CORES.verdeEscuro;
+        if (nivel === "Alto") badgeBg = CORES.vinho;
+        else if (nivel === "Médio" || nivel === "Moderado") badgeBg = CORES.ambar;
+
+        const xBadge = MARGIN + colNomeW + colEmailW + 2;
+        setColor(doc, badgeBg, "fill");
+        doc.roundedRect(xBadge, y + 1.8, colDiagW - 4, 6, 1.5, 1.5, "F");
+        setColor(doc, CORES.branco, "text");
+        doc.setFontSize(6.2);
+        doc.setFont("helvetica", "bold");
+        const resLabel = c.resultado.length > 30 ? c.resultado.slice(0, 30) + "…" : c.resultado;
+        doc.text(resLabel, xBadge + (colDiagW - 4) / 2, y + 5.8, { align: "center" });
+
+        // Impacto / Afastamento
+        setColor(doc, CORES.cinzaTexto, "text");
+        doc.setFontSize(6.8);
+        doc.setFont("helvetica", "normal");
+        const impTexto = c.horasAusencia && Number(c.horasAusencia) > 0 
+          ? `${c.horasAusencia}h ausência` 
+          : (c.impactoTrabalho || "Leve");
+        doc.text(impTexto, MARGIN + colNomeW + colEmailW + colDiagW + 2, y + 6);
+
+        y += 10;
+      }
+      indexColab = fimIndex;
+    }
+
+    rodape(doc, `Relatório Consolidado Institucional — ${dados.nomeEmpresa} — Confidencial (LGPD)`);
+  }
+
+  // ── PÁGINA FINAL: PARECER PARA GESTÃO DE PESSOAS E FATORES DE PROBABILIDADE ─
+  doc.addPage();
+  if (temTeste) marcaDaguaTeste(doc);
+  let y = cabecalho(
+    doc,
+    "Gestão de Pessoas e Parecer Clínico",
+    "Diretrizes de apoio corporativo e fatores diagnósticos",
+    TOTAL_PAG,
+    TOTAL_PAG,
+    temTeste
+  );
+
+  // 1. Parecer para o Setor Responsável pela Gestão de Pessoas (RH)
+  setColor(doc, CORES.palido, "fill");
+  doc.roundedRect(MARGIN, y, CONTENT_W, 58, 3, 3, "F");
+  setColor(doc, CORES.vinho, "stroke");
+  doc.setLineWidth(0.6);
+  doc.roundedRect(MARGIN, y, CONTENT_W, 58, 3, 3, "S");
+
+  setColor(doc, CORES.vinho, "text");
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.text("DIRETRIZES PARA O SETOR RESPONSÁVEL PELA GESTÃO DE PESSOAS (RH)", MARGIN + 5, y + 7);
+
+  setColor(doc, CORES.cinzaTexto, "text");
+  doc.setFontSize(7.2);
+  doc.setFont("helvetica", "normal");
+  const rhTexto = [
+    "A endometriose é uma doença inflamatória crônica que atinge mulheres em idade reprodutiva e produtiva, sendo uma das principais causas de dor incapacitante, absenteísmo e presenteísmo oculto.",
+    "",
+    "1. Acolhimento e Sigilo Absoluto: Os dados individuais deste relatório têm caráter estritamente médico e preventivo. As informações não devem ser utilizadas para fins discriminatórios ou avaliações de desempenho.",
+    "2. Encaminhamento Médico Especializado: Recomenda-se que o setor de Recursos Humanos / Saúde Ocupacional oriente as colaboradoras com probabilidade Alta e Moderada a buscar ginecologistas especializados em endometriose e dor pélvica.",
+    "3. Flexibilidade e Ergonomia: Casos de dor crônica beneficiam-se de flexibilidade de horários ou regime híbrido/remoto nos dias mais críticos do ciclo menstrual, minimizando a perda de produtividade.",
+    "4. Campanhas Corporativas: A promoção de rodas de conversa e palestras sobre saúde reprodutiva reduz o estigma e encoraja a busca precoce por tratamento."
+  ];
+
+  let yRh = y + 13;
+  rhTexto.forEach(linha => {
+    if (linha === "") {
+      yRh += 2;
+    } else {
+      const splitLinha = doc.splitTextToSize(linha, CONTENT_W - 10);
+      doc.text(splitLinha, MARGIN + 5, yRh);
+      yRh += splitLinha.length * 3.6;
+    }
+  });
+
+  y += 64;
+
+  // 2. Observação Estatística do Quadro Pesquisado
+  setColor(doc, CORES.cinzaClaro, "fill");
+  doc.roundedRect(MARGIN, y, CONTENT_W, 30, 3, 3, "F");
+  setColor(doc, CORES.rosa, "stroke");
+  doc.setLineWidth(0.5);
+  doc.roundedRect(MARGIN, y, CONTENT_W, 30, 3, 3, "S");
+
+  setColor(doc, CORES.vinho, "text");
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "bold");
+  doc.text("OBSERVAÇÃO ESTATÍSTICA DO QUADRO DE MULHERES PESQUISADAS", MARGIN + 5, y + 6);
+
+  setColor(doc, CORES.preto, "text");
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  const estatTexto = [
+    `• Total de mulheres pesquisadas na instituição: ${dados.totalMulheresPesquisadas} colaboradora(s).`,
+    `• Mulheres com possibilidade de ter endometriose: ${dados.totalPossibilidadeEndometriose} colaboradora(s) (${dados.percentualPossibilidade}% do grupo avaliado).`,
+    `  - Alta Probabilidade: ${dados.totalAltaProbabilidade} colaboradora(s) | Moderada Probabilidade: ${dados.totalModeradaProbabilidade} colaboradora(s) | Baixa Probabilidade: ${dados.totalBaixaProbabilidade} colaboradora(s).`
+  ];
+  let yEst = y + 12;
+  estatTexto.forEach(l => {
+    doc.text(l, MARGIN + 5, yEst);
+    yEst += 5;
+  });
+
+  y += 36;
+
+  // 3. Classificação dos Fatores de Probabilidade Clínica de Sintomas
+  setColor(doc, CORES.cinzaClaro, "fill");
+  doc.roundedRect(MARGIN, y, CONTENT_W, 60, 3, 3, "F");
+  setColor(doc, CORES.paleRosa, "stroke");
+  doc.setLineWidth(0.5);
+  doc.roundedRect(MARGIN, y, CONTENT_W, 60, 3, 3, "S");
+
+  setColor(doc, CORES.vinho, "text");
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "bold");
+  doc.text("FATORES DE PROBABILIDADE CLÍNICA E CRITÉRIOS DIAGNÓSTICOS", MARGIN + 5, y + 6);
+
+  const fatores = [
+    {
+      titulo: "ALTO (Alta Probabilidade — Pontuação clínica >= 8):",
+      cor: CORES.vinho,
+      desc: "Concomitância de intensidade severa de dor (escala EVA >= 7) com múltiplos sintomas clínicos incapacitantes (cólica menstrual refratária, dor pélvica acíclica, dor profunda na relação sexual, dor evacuatória/urinária e fadiga crônica). Forte concordância clínica com endometriose profunda ou infiltrativa, requerendo encaminhamento prioritário para mapeamento com preparo e ressonância magnética."
+    },
+    {
+      titulo: "MÉDIO / MODERADO (Moderada Probabilidade — Pontuação clínica 4 a 7):",
+      cor: CORES.ambar,
+      desc: "Presença de sintomas clínicos com repercussão intermediária na qualidade de vida e na rotina laboral. Justifica consulta ginecológica para investigação diagnóstica, diagnóstico diferencial e controle precoce de sintomas antes de eventual progressão lesional."
+    },
+    {
+      titulo: "BAIXO (Baixa Probabilidade — Pontuação clínica < 4):",
+      cor: CORES.verdeEscuro,
+      desc: "Manifestações isoladas ou de baixa intensidade sem critérios típicos de acometimento pélvico extenso. Recomenda-se a manutenção do acompanhamento preventivo anual com ginecologista de confiança."
+    }
+  ];
+
+  let yFat = y + 12;
+  fatores.forEach(f => {
+    setColor(doc, f.cor, "text");
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.text(f.titulo, MARGIN + 5, yFat);
+    yFat += 4;
+
+    setColor(doc, CORES.cinzaTexto, "text");
+    doc.setFontSize(6.8);
+    doc.setFont("helvetica", "normal");
+    const descLines = doc.splitTextToSize(f.desc, CONTENT_W - 10);
+    doc.text(descLines, MARGIN + 5, yFat);
+    yFat += descLines.length * 3.4 + 2;
+  });
+
+  // Rodapé da página final
+  rodape(doc, `ENDOMETRIÔMETRO — Relatório Consolidado Institucional emitido em ${dataStr}. Proteção LGPD aplicada.`);
+
+  // Salvar PDF
+  const safeName = dados.nomeEmpresa.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30);
+  doc.save(`relatorio-consolidado-${safeName}-${dataStr.replace(/\//g, "-")}.pdf`);
 }

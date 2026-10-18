@@ -47,30 +47,62 @@ export function useAuth() {
 
   const fetchProfile = async (userId: string, email: string) => {
     try {
+      const cleanEmail = email.trim().toLowerCase();
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== "PGRST116") {
         console.error("Erro ao buscar perfil:", error);
       }
 
+      // Checar se o usuário está associado a alguma empresa em companies
+      let companyLinkedId = data?.company_id || null;
+      let isCompanyUser = data?.role === "instituicao" || data?.tipo_usuario === "EMPRESA" || !!companyLinkedId;
+
+      if (!companyLinkedId) {
+        const { data: comp } = await supabase
+          .from("companies")
+          .select("id")
+          .or(`user_id.eq.${userId},contact_email.eq.${cleanEmail}`)
+          .limit(1)
+          .maybeSingle();
+
+        if (comp) {
+          companyLinkedId = comp.id;
+          isCompanyUser = true;
+
+          // Sincronizar de volta com profiles se possível
+          supabase.from("profiles").upsert([{
+            id: userId,
+            email: cleanEmail,
+            role: "instituicao",
+            tipo_usuario: "EMPRESA",
+            company_id: comp.id,
+          }]).then();
+        }
+      }
+
+      const metaRole = (session?.user?.user_metadata?.role as "instituicao" | "participante" | "admin") || null;
+      const finalRole: "instituicao" | "participante" | "admin" = isCompanyUser || metaRole === "instituicao" ? "instituicao" : (data?.role || metaRole || "participante");
+
       if (data) {
         setProfile({
           id: data.id,
-          email: data.email || email,
-          role: data.role || (data.tipo_usuario === "EMPRESA" ? "instituicao" : "participante"),
+          email: data.email || cleanEmail,
+          role: finalRole,
           full_name: data.full_name || data.nome,
-          company_id: data.company_id,
+          company_id: companyLinkedId,
         });
       } else {
-        // Fallback se perfil não existir ainda
+        // Fallback se perfil não existir ainda no profiles
         setProfile({
           id: userId,
-          email,
-          role: "participante",
+          email: cleanEmail,
+          role: finalRole,
+          company_id: companyLinkedId,
         });
       }
     } catch (e) {

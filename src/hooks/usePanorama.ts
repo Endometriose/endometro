@@ -31,13 +31,45 @@ export const usePanorama = (escopo: 'geral' | 'pesquisa' = 'geral', pesquisaId?:
   return useQuery({
     queryKey: ['panorama', escopo, pesquisaId, INCLUIR_TESTE],
     queryFn: async (): Promise<PanoramaData> => {
-      const { data, error } = await supabase.rpc('get_panorama', {
-        p_escopo: escopo,
-        p_survey_id: pesquisaId || null,
-        p_incluir_teste: INCLUIR_TESTE,
-      });
-      if (error) throw new Error(error.message || 'Erro ao carregar panorama');
-      return { ...(data as PanoramaData), incluiu_teste: INCLUIR_TESTE };
+      try {
+        const { data, error } = await supabase.rpc('get_panorama', {
+          p_escopo: escopo,
+          p_survey_id: pesquisaId || null,
+          p_incluir_teste: INCLUIR_TESTE,
+        });
+        if (error) {
+          console.warn('Aviso get_panorama:', error.message);
+          return {
+            k1_total_pesquisadas: 0,
+            k2_total_com_sintoma: 0,
+            k3_percentual_sintoma: 0,
+            k4_total_individual: 0,
+            k5_total_empresa: 0,
+            k6_total_empresas_pesq: 0,
+            d4_individual_com_sintoma: 0,
+            d5_empresa_com_sintoma: 0,
+            suficiente: false,
+            atualizado_em: new Date().toISOString(),
+            incluiu_teste: false,
+          };
+        }
+        return { ...(data as PanoramaData), incluiu_teste: INCLUIR_TESTE };
+      } catch (err: any) {
+        console.warn('Exceção get_panorama:', err?.message);
+        return {
+          k1_total_pesquisadas: 0,
+          k2_total_com_sintoma: 0,
+          k3_percentual_sintoma: 0,
+          k4_total_individual: 0,
+          k5_total_empresa: 0,
+          k6_total_empresas_pesq: 0,
+          d4_individual_com_sintoma: 0,
+          d5_empresa_com_sintoma: 0,
+          suficiente: false,
+          atualizado_em: new Date().toISOString(),
+          incluiu_teste: false,
+        };
+      }
     },
     refetchInterval: 60000,
     refetchOnWindowFocus: true,
@@ -54,15 +86,23 @@ export const useDistribuicao = (
   return useQuery({
     queryKey: ['distribuicao', dimensao, origem, escopo, pesquisaId, INCLUIR_TESTE],
     queryFn: async (): Promise<DistribuicaoItem[]> => {
-      const { data, error } = await supabase.rpc('get_distribuicao', {
-        p_escopo: escopo,
-        p_dimensao: dimensao,
-        p_origem: origem,
-        p_survey_id: pesquisaId || null,
-        p_incluir_teste: INCLUIR_TESTE,
-      });
-      if (error) throw new Error(error.message || 'Erro ao carregar distribuição');
-      return (data as DistribuicaoItem[]) || [];
+      try {
+        const { data, error } = await supabase.rpc('get_distribuicao', {
+          p_escopo: escopo,
+          p_dimensao: dimensao,
+          p_origem: origem,
+          p_survey_id: pesquisaId || null,
+          p_incluir_teste: INCLUIR_TESTE,
+        });
+        if (error) {
+          console.warn('Aviso get_distribuicao:', error.message);
+          return [];
+        }
+        return (data as DistribuicaoItem[]) || [];
+      } catch (err: any) {
+        console.warn('Exceção get_distribuicao:', err?.message);
+        return [];
+      }
     },
     refetchInterval: 60000,
     refetchOnWindowFocus: true,

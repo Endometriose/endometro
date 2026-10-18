@@ -32,15 +32,16 @@ const KCard = ({ icon: Icon, value, label, color }: { icon: any; value: number |
 
 // ----- Donut Puro -----
 const DonutInner = ({
-  data, centerValue, centerLabel, colors = DONUT_SIM, isEnlarged = false
+  data = [], centerValue, centerLabel, colors = DONUT_SIM, isEnlarged = false
 }: {
-  data: { name: string; value: number }[];
+  data?: { name: string; value: number }[];
   centerValue: string;
   centerLabel: string;
   colors?: string[];
   isEnlarged?: boolean;
 }) => {
-  const total = data.reduce((s, d) => s + d.value, 0);
+  const safeData = Array.isArray(data) ? data : [];
+  const total = safeData.reduce((s, d) => s + (d?.value || 0), 0);
   if (total === 0) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
@@ -54,7 +55,7 @@ const DonutInner = ({
     <ResponsiveContainer width="100%" height="100%">
       <PieChart>
         <Pie
-          data={data}
+          data={safeData}
           cx="50%"
           cy="50%"
           innerRadius={isEnlarged ? "50%" : "55%"}
@@ -65,7 +66,7 @@ const DonutInner = ({
           strokeWidth={2}
           stroke="#fff"
         >
-          {data.map((_, i) => (
+          {safeData.map((_, i) => (
             <Cell key={i} fill={colors[i % colors.length]} />
           ))}
         </Pie>
@@ -211,7 +212,7 @@ const PanoramaSection = ({ companyId }: PanoramaSectionProps = {}) => {
       </div>
     );
   }
-  if (isError || !data) return null;
+  if (isError || !data || (companyId && data.k1_total_pesquisadas === 0)) return null;
 
   const k1 = data.k1_total_pesquisadas;
   const k2 = data.k2_total_com_sintoma;

@@ -1,9 +1,26 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { UserCheck, Building2 } from "lucide-react";
+import { ParticipantLoginModal } from "@/components/ParticipantLoginModal";
+import { QuestionarioIndividualModal } from "@/components/QuestionarioIndividualModal";
+import { supabase } from "@/lib/supabase";
 
 const SurveyButton = () => {
   const navigate = useNavigate();
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isSurveyModalOpen, setIsSurveyModalOpen] = useState(false);
+
+  const handleParticipateClick = async () => {
+    // Desconecta qualquer sessão anterior para sempre exigir que o participante digite seu e-mail e senha
+    await supabase.auth.signOut();
+    setIsLoginModalOpen(true);
+  };
+
+  const handleLoginSuccess = () => {
+    setIsLoginModalOpen(false);
+    setIsSurveyModalOpen(true);
+  };
 
   return (
     <section id="participe" className="py-16 px-4 bg-rose-blush/80 border-y border-rose-200">
@@ -32,7 +49,7 @@ const SurveyButton = () => {
             <Button
               size="lg"
               className="w-full bg-secondary hover:bg-secondary/90 text-white font-bold text-base py-6 rounded-xl shadow-md"
-              onClick={() => navigate("/pesquisa")}
+              onClick={handleParticipateClick}
             >
               <UserCheck className="mr-2 h-5 w-5" />
               Participar da pesquisa
@@ -63,6 +80,17 @@ const SurveyButton = () => {
           </div>
         </div>
       </div>
+
+      <ParticipantLoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onSuccess={handleLoginSuccess}
+      />
+
+      <QuestionarioIndividualModal
+        isOpen={isSurveyModalOpen}
+        onClose={() => setIsSurveyModalOpen(false)}
+      />
     </section>
   );
 };

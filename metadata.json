@@ -1,0 +1,6 @@
+{
+  "name": "Endômetro - Monitoramento e Avaliação da Endometriose",
+  "description": "Plataforma clínica para diário de sintomas, escalas de dor EVA, calculadoras de estadiamento rASRM, índice de fertilidade EFI, classificação #Enzian e relatórios para consultas médicas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

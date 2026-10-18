@@ -14,8 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["Playfair Display", "serif"],
-        body: ["Nunito", "sans-serif"],
+        display: ["Nunito", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
+        body: ["Nunito", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
+        sans: ["Nunito", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -76,6 +77,9 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        xl: "1rem",
+        "2xl": "1.25rem",
+        "3xl": "1.5rem",
       },
       keyframes: {
         "accordion-down": {

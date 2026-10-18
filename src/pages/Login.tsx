@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Eye, EyeOff, Building2, UserCheck, KeyRound, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import { ModalAcessoEmpresa } from "@/components/ModalAcessoEmpresa";
 
 const formatCnpj = (value: string) => {
   const digits = value.replace(/\D/g, "").slice(0, 14);
@@ -38,6 +39,11 @@ const Login = () => {
   const [termosLgpd, setTermosLgpd] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Estados do Modal da Empresa
+  const [showModalEmpresa, setShowModalEmpresa] = useState(false);
+  const [empresaCriadaNome, setEmpresaCriadaNome] = useState("");
+  const [empresaCriadaLink, setEmpresaCriadaLink] = useState("");
+
   // 1. Ação ENTRAR (Login)
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,10 +64,21 @@ const Login = () => {
       if (data.user) {
         toast.success("Login realizado com sucesso!");
         
-        // Redirecionamento por returnUrl ou perfil
+        // Verificar se usuário é instituição/empresa
+        const { data: userProfile } = await supabase
+          .from("profiles")
+          .select("role, tipo_usuario, company_id")
+          .eq("id", data.user.id)
+          .maybeSingle();
+
+        const isInst = role === "instituicao" || 
+                       userProfile?.role === "instituicao" || 
+                       userProfile?.tipo_usuario === "EMPRESA" || 
+                       Boolean(userProfile?.company_id);
+
         if (returnUrl) {
           navigate(decodeURIComponent(returnUrl));
-        } else if (role === "instituicao") {
+        } else if (isInst) {
           navigate("/banco-de-dados");
         } else {
           navigate("/pesquisa");
@@ -90,59 +107,147 @@ const Login = () => {
 
     setIsSubmitting(true);
     try {
+      const cleanEmail = email.trim().toLowerCase();
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
+        email: cleanEmail,
         password: senha,
-      });
-
-      if (authError) throw authError;
-
-      if (authData.user) {
-        let createdCompanyId = null;
-
-        // Se for instituição, cria primeiro o registro da empresa
-        if (role === "instituicao") {
-          const { data: companyData } = await supabase
-            .from("companies")
-            .insert([
-              {
-                name: nome,
-                cnpj_or_identifier: cnpj || null,
-                contact_email: email,
-                code_slug: encodeURIComponent(nome.trim().replace(/\s+/g, "_")),
-              },
-            ])
-            .select("id")
-            .single();
-
-          if (companyData) {
-            createdCompanyId = companyData.id;
-          }
-        }
-
-        // Criar ou atualizar perfil com o role correto
-        await supabase.from("profiles").upsert([
-          {
-            id: authData.user.id,
-            email,
+        options: {
+          data: {
             full_name: nome,
             role: role,
-            company_id: createdCompanyId,
+            tipo_usuario: role === "instituicao" ? "EMPRESA" : null,
+          },
+        },
+      });
+
+      let userObj = authData?.user;
+      if (authError) {
+        if (authError.message.includes("already registered") || authError.message.includes("already exists")) {
+          const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email: cleanEmail,
+            password: senha,
+          });
+          if (signInError) {
+            throw new Error("Este e-mail já possui cadastro. Use a aba 'Entrar' ou informe a senha correta.");
+          }
+          userObj = signInData.user;
+        } else {
+          throw authError;
+        }
+      }
+
+      if (userObj) {
+        const userId = userObj.id;
+        let createdCompanyId = null;
+
+        // 1. Criar perfil primeiro para satisfazer chave estrangeira de companies.user_id
+        await supabase.from("profiles").upsert([
+          {
+            id: userId,
+            email: cleanEmail,
+            full_name: nome,
+            nome: nome,
+            role: role,
+            tipo_usuario: role === "instituicao" ? "EMPRESA" : null,
           },
         ]);
+
+        // 2. Se for instituição, criar ou vincular o registro da empresa
+        if (role === "instituicao") {
+          const codSlug = encodeURIComponent(nome.trim().toLowerCase().replace(/\s+/g, "_")) + "_" + Date.now().toString().slice(-4);
+          const cleanCnpj = cnpj.trim();
+          let slugToUse = codSlug;
+
+          // Buscar empresa existente por CNPJ, email ou user_id para evitar duplicação ou conflito de chave única
+          let existingCompQuery = supabase.from("companies").select("id, code_slug");
+          if (cleanCnpj) {
+            existingCompQuery = existingCompQuery.or(`cnpj.eq.${cleanCnpj},cnpj_or_identifier.eq.${cleanCnpj},contact_email.eq.${cleanEmail},user_id.eq.${userId}`);
+          } else {
+            existingCompQuery = existingCompQuery.or(`contact_email.eq.${cleanEmail},user_id.eq.${userId}`);
+          }
+
+          const { data: existingComp } = await existingCompQuery.limit(1).maybeSingle();
+
+          if (existingComp) {
+            createdCompanyId = existingComp.id;
+            if (existingComp.code_slug) slugToUse = existingComp.code_slug;
+
+            await supabase.from("companies").update({
+              user_id: userId,
+              name: nome,
+              nome_empresa: nome,
+              cnpj: cleanCnpj || null,
+              cnpj_or_identifier: cleanCnpj || null,
+              setor: setor || null,
+              contact_email: cleanEmail,
+            }).eq("id", existingComp.id);
+          } else {
+            const { data: companyData, error: compErr } = await supabase
+              .from("companies")
+              .insert([
+                {
+                  user_id: userId,
+                  name: nome,
+                  nome_empresa: nome,
+                  cnpj: cleanCnpj || null,
+                  cnpj_or_identifier: cleanCnpj || null,
+                  setor: setor || null,
+                  contact_email: cleanEmail,
+                  code_slug: codSlug,
+                },
+              ])
+              .select("id, code_slug")
+              .single();
+
+            if (companyData) {
+              createdCompanyId = companyData.id;
+              if (companyData.code_slug) slugToUse = companyData.code_slug;
+            } else if (compErr) {
+              console.warn("Tentando recuperar empresa por CNPJ após aviso:", compErr.message);
+              if (cleanCnpj) {
+                const { data: compByCnpj } = await supabase
+                  .from("companies")
+                  .select("id, code_slug")
+                  .or(`cnpj.eq.${cleanCnpj},cnpj_or_identifier.eq.${cleanCnpj}`)
+                  .limit(1)
+                  .maybeSingle();
+                if (compByCnpj) {
+                  createdCompanyId = compByCnpj.id;
+                  if (compByCnpj.code_slug) slugToUse = compByCnpj.code_slug;
+                  await supabase.from("companies").update({ user_id: userId }).eq("id", compByCnpj.id);
+                }
+              }
+            }
+          }
+
+          if (createdCompanyId) {
+            await supabase.from("profiles").update({ company_id: createdCompanyId, role: "instituicao", tipo_usuario: "EMPRESA" }).eq("id", userId);
+            try {
+              sessionStorage.setItem("empresa_ativa", JSON.stringify({ id: createdCompanyId, name: nome, code_slug: slugToUse }));
+            } catch (e) {}
+          }
+
+          const generatedUrl = `${window.location.origin}/pesquisa?empresa=${slugToUse}`;
+          setEmpresaCriadaNome(nome);
+          setEmpresaCriadaLink(generatedUrl);
+          setShowModalEmpresa(true);
+          toast.success("Conta da empresa criada com sucesso! Abrindo opções de acesso.");
+          return;
+        }
 
         toast.success("Conta criada com sucesso!");
 
         if (returnUrl) {
           navigate(decodeURIComponent(returnUrl));
-        } else if (role === "instituicao") {
-          navigate("/banco-de-dados");
         } else {
           navigate("/pesquisa");
         }
       }
     } catch (err: any) {
-      toast.error(err.message || "Erro ao criar conta.");
+      const msg = err.message === "User already registered"
+        ? "Este e-mail já está cadastrado. Acesse a aba Entrar para fazer login."
+        : (err.message || "Erro ao criar conta.");
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -425,6 +530,18 @@ const Login = () => {
 
         </div>
       </main>
+
+      <ModalAcessoEmpresa
+        isOpen={showModalEmpresa}
+        onClose={() => setShowModalEmpresa(false)}
+        empresaNome={empresaCriadaNome}
+        linkExclusivo={empresaCriadaLink}
+        onAcessarPainel={() => {
+          setShowModalEmpresa(false);
+          navigate("/banco-de-dados");
+        }}
+      />
+
       <Footer />
     </div>
   );
