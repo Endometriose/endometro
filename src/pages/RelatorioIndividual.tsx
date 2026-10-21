@@ -4,8 +4,23 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
-import { AlertCircle, Download, FileText, ArrowRight, Activity, CalendarDays, Brain, Loader2 } from "lucide-react";
+import { AlertCircle, Download, FileText, ArrowRight, Activity, CalendarDays, Brain, Loader2, CheckCircle2 } from "lucide-react";
 import { gerarRelatorioIndividual } from "@/lib/relatorio-pdf/gerarPDF";
+
+export const SINTOMAS_DETALHADOS = [
+  { id: "colica_intensa", label: "Cólicas menstruais muito intensas que impedem atividades normais", peso: 3, categoria: "Dor Menstrual" },
+  { id: "dor_relacao", label: "Dor profunda durante ou após relações sexuais (dispareunia)", peso: 3, categoria: "Sexualidade" },
+  { id: "dor_pelvica_cronica", label: "Dor pélvica ou abdominal contínua mesmo fora da menstruação", peso: 2, categoria: "Dor Crônica" },
+  { id: "dor_intestino", label: "Dor ao evacuar, diarreia, constipação ou distensão abdominal no período menstrual", peso: 2, categoria: "Intestinal" },
+  { id: "dor_xixi", label: "Dor, ardência ou sangramento ao urinar durante a menstruação", peso: 2, categoria: "Urinário" },
+  { id: "historico_familiar", label: "Mãe, irmã ou parente de 1º grau diagnosticada com endometriose", peso: 2, categoria: "Genético" },
+  { id: "dificuldade_engravidar", label: "Dificuldade para engravidar há mais de 6 a 12 meses", peso: 2, categoria: "Fertilidade" },
+  { id: "dor_lombar_pernas", label: "Dor na região lombar ou irradiada para as pernas no período menstrual", peso: 2, categoria: "Nervos / Lombar" },
+  { id: "uso_analgesicos", label: "Necessidade de tomar analgésicos fortes ou injeções frequentemente para conter a dor", peso: 2, categoria: "Medicação" },
+  { id: "historico_cistos", label: "Histórico de cistos ovarianos, miomas ou cirurgias pélvicas prévias", peso: 1, categoria: "Histórico Pélvico" },
+  { id: "fadiga_extrema", label: "Fadiga crônica, exaustão física e tonturas sem causa aparente", peso: 1, categoria: "Sistêmico" },
+  { id: "ansiedade_dor", label: "Ansiedade, estresse ou impacto emocional devido às dores crônicas", peso: 1, categoria: "Emocional" },
+];
 
 const RelatorioIndividual = () => {
   const navigate = useNavigate();
@@ -183,21 +198,65 @@ const RelatorioIndividual = () => {
               </div>
             </div>
 
-            {/* Sintomas */}
-            {sintomas.length > 0 && (
-              <div>
-                <h4 className="text-sm text-muted-foreground uppercase tracking-wider font-semibold mb-3 flex items-center gap-2">
-                  <FileText className="w-4 h-4" /> Sintomas que você relatou
+            {/* Sintomas e Situações Relatadas no Questionário */}
+            <div>
+              <div className="flex items-center justify-between mb-3 border-b border-rose-100 pb-2">
+                <h4 className="text-sm text-foreground uppercase tracking-wider font-bold flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-primary" /> Sintomas e Situações Relatadas no Questionário
                 </h4>
-                <div className="flex flex-wrap gap-2">
-                  {sintomas.map((s: string) => (
-                    <span key={s} className="bg-rose-50 text-secondary px-3 py-1.5 rounded-lg text-sm font-medium border border-rose-100">
-                      {s}
-                    </span>
-                  ))}
-                </div>
+                <span className="text-xs font-bold text-secondary bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
+                  {sintomas.length} {sintomas.length === 1 ? "sintoma relatado" : "sintomas relatados"}
+                </span>
               </div>
-            )}
+
+              {sintomas.length === 0 ? (
+                <div className="p-4 rounded-xl bg-rose-50/50 border border-rose-100 text-xs text-muted-foreground italic">
+                  Nenhum sintoma específico foi assinalado no questionário de triagem.
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {sintomas.map((sId: string, idx: number) => {
+                    const item = SINTOMAS_DETALHADOS.find(x => x.id === sId) || {
+                      id: sId,
+                      label: sId.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()),
+                      peso: 1,
+                      categoria: "Sintoma Relatado"
+                    };
+
+                    const isHighImpact = item.peso >= 3;
+                    const isMediumImpact = item.peso === 2;
+
+                    return (
+                      <div 
+                        key={sId || idx}
+                        className="flex items-start gap-3 p-3.5 rounded-2xl bg-pink-soft/40 border border-rose-200/80 hover:bg-rose-50/70 transition-colors"
+                      >
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+                          isHighImpact ? "bg-rose-700 text-white" : isMediumImpact ? "bg-primary text-white" : "bg-rose-200 text-secondary"
+                        }`}>
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-xs md:text-sm text-foreground leading-snug">
+                            {item.label}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-white border border-rose-200 text-secondary">
+                              {item.categoria}
+                            </span>
+                            {isHighImpact && (
+                              <span className="text-[10px] font-bold text-rose-800 bg-rose-100 px-2 py-0.5 rounded-md">
+                                Critério Clínico de Maior Relevância
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {/* Impacto no trabalho */}
             {userData?.trabalha === "Sim" && (

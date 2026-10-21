@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { 
   Building, ShieldCheck, Copy, Share2, 
   FileText, Download, Plus, Calendar, Loader2, MapPin,
-  Terminal, Users, FileDown, AlertTriangle, Stethoscope, CheckCircle2, Search, Sparkles, ShieldAlert
+  Terminal, Users, FileDown, AlertTriangle, Stethoscope, CheckCircle2, Search, Sparkles, ShieldAlert, RefreshCw, LogOut, ExternalLink
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -47,6 +47,7 @@ const EmpresaDashboard = () => {
   const [showTerminalModal, setShowTerminalModal] = useState(false);
   const [gerandoPdfConsolidado, setGerandoPdfConsolidado] = useState(false);
   const [filtroTabela, setFiltroTabela] = useState("");
+  const [recarregando, setRecarregando] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
   // Formulário Nova Pesquisa
@@ -54,229 +55,336 @@ const EmpresaDashboard = () => {
   const [novoTitulo, setNovoTitulo] = useState("");
   const [novaDescricao, setNovaDescricao] = useState("");
 
-  useEffect(() => {
-    const fetchCompanyAndSurveys = async () => {
+  const handleSairConta = async () => {
+    try {
+      sessionStorage.removeItem("empresa_ativa");
+      await supabase.auth.signOut();
+      window.dispatchEvent(new Event("empresa_atualizada"));
+      toast.success("Você saiu da conta institucional com sucesso.");
+      navigate("/");
+    } catch (e) {
+      console.error(e);
+      navigate("/");
+    }
+  };
+
+  const carregarDadosCompletos = async (isManualRefresh = false) => {
+    if (isManualRefresh) setRecarregando(true);
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        setLoading(false);
+        setRecarregando(false);
+        return;
+      }
+
+      const cleanEmail = currentUser.email?.trim().toLowerCase() || "";
+      let cachedEmpresa: any = null;
       try {
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        if (!currentUser) {
-          setLoading(false);
-          return;
-        }
+        const raw = sessionStorage.getItem("empresa_ativa");
+        if (raw) cachedEmpresa = JSON.parse(raw);
+      } catch (e) {}
 
-        const cleanEmail = currentUser.email?.trim().toLowerCase() || "";
-        let cachedEmpresa: any = null;
-        try {
-          const raw = sessionStorage.getItem("empresa_ativa");
-          if (raw) cachedEmpresa = JSON.parse(raw);
-        } catch (e) {}
+      // 1. Buscar perfil para checar company_id
+      const { data: userProfile } = await supabase
+        .from("profiles")
+        .select("company_id, role, full_name, nome")
+        .eq("id", currentUser.id)
+        .maybeSingle();
 
-        // 1. Buscar perfil para checar company_id
-        const { data: userProfile } = await supabase
-          .from("profiles")
-          .select("company_id, role, full_name, nome")
-          .eq("id", currentUser.id)
+      // 2. Buscar empresa vinculada
+      let company: any = null;
+
+      if (userProfile?.company_id) {
+        const { data } = await supabase
+          .from("companies")
+          .select("id, name, nome_empresa, code_slug, cnpj, cnpj_or_identifier, contact_email, setor, created_at")
+          .eq("id", userProfile.company_id)
+          .maybeSingle();
+        if (data) company = data;
+      }
+
+      if (!company && cachedEmpresa?.id) {
+        const { data } = await supabase
+          .from("companies")
+          .select("id, name, nome_empresa, code_slug, cnpj, cnpj_or_identifier, contact_email, setor, created_at")
+          .eq("id", cachedEmpresa.id)
+          .maybeSingle();
+        if (data) company = data;
+      }
+
+      if (!company) {
+        const { data } = await supabase
+          .from("companies")
+          .select("id, name, nome_empresa, code_slug, cnpj, cnpj_or_identifier, contact_email, setor, created_at")
+          .eq("user_id", currentUser.id)
+          .limit(1)
+          .maybeSingle();
+        if (data) company = data;
+      }
+
+      if (!company && cleanEmail) {
+        const emailPrefix = cleanEmail.split("@")[0];
+        const { data } = await supabase
+          .from("companies")
+          .select("id, name, nome_empresa, code_slug, cnpj, cnpj_or_identifier, contact_email, setor, created_at")
+          .or(`contact_email.ilike.${cleanEmail},name.ilike.%${emailPrefix}%,code_slug.ilike.%${emailPrefix}%`)
+          .limit(1)
+          .maybeSingle();
+        if (data) company = data;
+      }
+
+      if (!company && cachedEmpresa) {
+        company = {
+          id: cachedEmpresa.id || "empresa-local",
+          name: cachedEmpresa.name || "Sua Empresa",
+          nome_empresa: cachedEmpresa.name || "Sua Empresa",
+          code_slug: cachedEmpresa.code_slug || "empresa",
+          cnpj: "",
+          contact_email: cleanEmail,
+          created_at: new Date().toISOString(),
+        };
+      }
+
+      if (!company) {
+        const fallbackNome = userProfile?.full_name || userProfile?.nome || currentUser.user_metadata?.full_name || cleanEmail.split("@")[0] || "Empresa Cadastrada";
+        const codSlug = encodeURIComponent(fallbackNome.trim().toLowerCase().replace(/\s+/g, "_")) + "_" + Date.now().toString().slice(-4);
+
+        const { data: newComp } = await supabase
+          .from("companies")
+          .insert([{
+            user_id: currentUser.id,
+            name: fallbackNome,
+            nome_empresa: fallbackNome,
+            contact_email: cleanEmail,
+            code_slug: codSlug,
+          }])
+          .select("id, name, nome_empresa, code_slug, cnpj, cnpj_or_identifier, contact_email, setor, created_at")
           .maybeSingle();
 
-        // 2. Buscar empresa vinculada
-        let company: any = null;
+        if (newComp) {
+          company = newComp;
+          await supabase.from("profiles").update({ company_id: newComp.id, role: "instituicao" }).eq("id", currentUser.id);
+        }
+      }
 
-        if (userProfile?.company_id) {
-          const { data } = await supabase
-            .from("companies")
-            .select("id, name, nome_empresa, code_slug, cnpj, cnpj_or_identifier, contact_email, setor, created_at")
-            .eq("id", userProfile.company_id)
-            .maybeSingle();
-          if (data) company = data;
+      if (company) {
+        const compName = company.name || company.nome_empresa || "Sua Empresa";
+        setCompanyId(company.id);
+        setCompanyName(compName);
+        setCompanyCnpj(company.cnpj || company.cnpj_or_identifier || "");
+        setCompanySetor(company.setor || "");
+
+        // Sincronizar nos storages e emitir evento global para que o cabeçalho e todas as abas reflitam a empresa ativa
+        sessionStorage.setItem("empresa_ativa", JSON.stringify({ id: company.id, name: compName, code_slug: company.code_slug }));
+        window.dispatchEvent(new Event("empresa_atualizada"));
+
+        if (userProfile && !userProfile.company_id) {
+          supabase.from("profiles").update({ company_id: company.id, role: "instituicao" }).eq("id", currentUser.id).then();
         }
 
-        if (!company && cachedEmpresa?.id) {
-          const { data } = await supabase
-            .from("companies")
-            .select("id, name, nome_empresa, code_slug, cnpj, cnpj_or_identifier, contact_email, setor, created_at")
-            .eq("id", cachedEmpresa.id)
-            .maybeSingle();
-          if (data) company = data;
-        }
+        // 1. Respostas do Supabase
+        const { data: respostasSupabase } = await supabase
+          .from("survey_responses")
+          .select("id, user_id, created_at, idade, cidade, bairro, estado, diagnostico, sintomas, intensidade_dor, trabalha, impacto_trabalho, horas_ausencia, dias_atestado, status, responses")
+          .eq("company_id", company.id)
+          .eq("status", "concluida")
+          .order("created_at", { ascending: false });
 
-        if (!company) {
-          // Tentar por user_id
-          const { data } = await supabase
-            .from("companies")
-            .select("id, name, nome_empresa, code_slug, cnpj, cnpj_or_identifier, contact_email, setor, created_at")
-            .eq("user_id", currentUser.id)
-            .limit(1)
-            .maybeSingle();
-          if (data) company = data;
-        }
-
-        if (!company && cleanEmail) {
-          // Tentar por contact_email ou prefixo do e-mail (ex: ctor4.com)
-          const emailPrefix = cleanEmail.split("@")[0];
-          const { data } = await supabase
-            .from("companies")
-            .select("id, name, nome_empresa, code_slug, cnpj, cnpj_or_identifier, contact_email, setor, created_at")
-            .or(`contact_email.ilike.${cleanEmail},name.ilike.%${emailPrefix}%,code_slug.ilike.%${emailPrefix}%`)
-            .limit(1)
-            .maybeSingle();
-          if (data) company = data;
-        }
-
-        if (!company && cachedEmpresa) {
-          company = {
-            id: cachedEmpresa.id || "empresa-local",
-            name: cachedEmpresa.name || "Sua Empresa",
-            nome_empresa: cachedEmpresa.name || "Sua Empresa",
-            code_slug: cachedEmpresa.code_slug || "empresa",
-            cnpj: "",
-            contact_email: cleanEmail,
-            created_at: new Date().toISOString(),
-          };
-        }
-
-        if (!company) {
-          // Se ainda não encontrou empresa, criar automaticamente para garantir acesso imediato
-          const fallbackNome = userProfile?.full_name || userProfile?.nome || currentUser.user_metadata?.full_name || cleanEmail.split("@")[0] || "Empresa Cadastrada";
-          const codSlug = encodeURIComponent(fallbackNome.trim().toLowerCase().replace(/\s+/g, "_")) + "_" + Date.now().toString().slice(-4);
-
-          const { data: newComp } = await supabase
-            .from("companies")
-            .insert([{
-              user_id: currentUser.id,
-              name: fallbackNome,
-              nome_empresa: fallbackNome,
-              contact_email: cleanEmail,
-              code_slug: codSlug,
-            }])
-            .select("id, name, nome_empresa, code_slug, cnpj, cnpj_or_identifier, contact_email, setor, created_at")
-            .maybeSingle();
-
-          if (newComp) {
-            company = newComp;
-            await supabase.from("profiles").update({ company_id: newComp.id, role: "instituicao" }).eq("id", currentUser.id);
-          }
-        }
-
-        if (company) {
-          const compName = company.name || company.nome_empresa || "Sua Empresa";
-          setCompanyId(company.id);
-          setCompanyName(compName);
-          setCompanyCnpj(company.cnpj || company.cnpj_or_identifier || "");
-          setCompanySetor(company.setor || "");
-
-          // Sincronizar company_id de volta no perfil se estava desatualizado
-          if (userProfile && !userProfile.company_id) {
-            supabase.from("profiles").update({ company_id: company.id, role: "instituicao" }).eq("id", currentUser.id).then();
+        // 2. Respostas locais do repositório da empresa (sincronizadas nas submissões)
+        let respostasLocais: any[] = [];
+        try {
+          const rawId = localStorage.getItem(`respostas_empresa_${company.id}`);
+          if (rawId) respostasLocais = [...respostasLocais, ...JSON.parse(rawId)];
+          if (company.code_slug) {
+            const rawSlug = localStorage.getItem(`respostas_empresa_${company.code_slug}`);
+            if (rawSlug) respostasLocais = [...respostasLocais, ...JSON.parse(rawSlug)];
           }
 
-          // Buscar respostas completas das colaboradoras desta empresa
-          const { data: respostas } = await supabase
-            .from("survey_responses")
-            .select("id, user_id, created_at, idade, cidade, bairro, estado, diagnostico, sintomas, intensidade_dor, trabalha, impacto_trabalho, horas_ausencia, dias_atestado, status, responses")
-            .eq("company_id", company.id)
-            .eq("status", "concluida")
-            .order("created_at", { ascending: false });
-
-          if (respostas) {
-            const bairros = [...new Set(
-              respostas
-                .map((r: any) => r.responses?.bairro || r.bairro)
-                .filter(Boolean)
-            )] as string[];
-            setBairrosDisponiveis(bairros);
-
-            // Obter nomes e emails dos perfis cadastrados
-            const userIds = [...new Set(respostas.map((r: any) => r.user_id).filter(Boolean))];
-            let profilesMap: Record<string, { nome: string; email: string }> = {};
-
-            if (userIds.length > 0) {
-              const { data: profs } = await supabase
-                .from("profiles")
-                .select("id, full_name, nome, email")
-                .in("id", userIds);
-              if (profs) {
-                profs.forEach((p: any) => {
-                  profilesMap[p.id] = {
-                    nome: p.full_name || p.nome || "Colaboradora",
-                    email: p.email || "",
-                  };
-                });
-              }
+          // Verificar todas as chaves survey_response_* no localStorage da máquina que pertençam a esta empresa
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith("survey_response_")) {
+              try {
+                const item = JSON.parse(localStorage.getItem(k) || "{}");
+                if (item.company_id === company.id || 
+                    item.empresa_token === company.code_slug || 
+                    (item.empresa_nome && item.empresa_nome.toLowerCase() === compName.toLowerCase())) {
+                  respostasLocais.push({
+                    id: `local_${k}`,
+                    ...item,
+                    responses: item,
+                    created_at: item.data_realizacao || new Date().toISOString(),
+                  });
+                }
+              } catch {}
             }
+          }
+        } catch (e) {
+          console.warn("Aviso ao ler respostas locais da empresa:", e);
+        }
 
-            const parsedColabs: ColaboradoraRegistro[] = respostas.map((r: any, idx: number) => {
-              const p = r.user_id ? profilesMap[r.user_id] : null;
-              const respPayload = r.responses || {};
-              const nome = respPayload.nome || respPayload.full_name || p?.nome || `Colaboradora #${idx + 1}`;
-              const email = respPayload.email || p?.email || `colaboradora.${idx + 1}@empresa.com`;
-              const resultadoRaw = respPayload.resultado || (r.diagnostico === "Sim" ? "Alta Probabilidade de Endometriose" : "Investigação Recomendada");
+        // Combinar e deduplicar respostas (por ID ou email)
+        const combinedMap: Record<string, any> = {};
+        (respostasSupabase || []).forEach(r => { combinedMap[r.id] = r; });
+        respostasLocais.forEach(r => {
+          const key = r.id || r.email || `temp_${Math.random()}`;
+          if (!combinedMap[key]) combinedMap[key] = r;
+        });
 
-              let nivel: "Alto" | "Médio" | "Moderado" | "Baixo" = "Baixo";
-              const rLower = String(resultadoRaw).toLowerCase();
-              if (rLower.includes("alta") || (Number(r.intensidade_dor) >= 7 && (r.sintomas || []).length >= 3)) {
-                nivel = "Alto";
-              } else if (rLower.includes("moderada") || rLower.includes("médio") || Number(r.intensidade_dor) >= 4) {
-                nivel = "Moderado";
-              } else {
-                nivel = "Baixo";
-              }
+        const allRespostas = Object.values(combinedMap);
 
-              const finalResultado = nivel === "Alto"
-                ? "Fator Alto — Alta Probabilidade"
-                : nivel === "Moderado" || nivel === "Médio"
-                ? "Fator Médio / Moderado — Prob. Moderada"
-                : "Fator Baixo — Baixa Probabilidade";
+        const bairros = [...new Set(
+          allRespostas
+            .map((r: any) => r.responses?.bairro || r.bairro)
+            .filter(Boolean)
+        )] as string[];
+        setBairrosDisponiveis(bairros);
 
-              return {
-                id: r.id,
-                nome,
-                email,
-                idade: r.idade || respPayload.idade,
-                diagnosticoPrevio: r.diagnostico,
-                resultado: finalResultado,
-                nivelProbabilidade: nivel,
-                intensidadeDor: r.intensidade_dor ?? respPayload.intensidadeDor ?? "—",
-                sintomas: r.sintomas || respPayload.sintomas || [],
-                impactoTrabalho: r.impacto_trabalho || respPayload.impactoTrabalho || "Moderado",
-                horasAusencia: r.horas_ausencia ?? respPayload.horasAusencia ?? 0,
-                diasAtestado: r.dias_atestado ?? respPayload.diasAtestado ?? 0,
-                dataResposta: r.created_at,
+        // Obter perfis para nomes
+        const userIds = [...new Set(allRespostas.map((r: any) => r.user_id).filter(Boolean))];
+        let profilesMap: Record<string, { nome: string; email: string }> = {};
+
+        if (userIds.length > 0) {
+          const { data: profs } = await supabase
+            .from("profiles")
+            .select("id, full_name, nome, email")
+            .in("id", userIds);
+          if (profs) {
+            profs.forEach((p: any) => {
+              profilesMap[p.id] = {
+                nome: p.full_name || p.nome || "Colaboradora",
+                email: p.email || "",
               };
             });
-
-            setColaboradoras(parsedColabs);
-          }
-
-          // Buscar pesquisas da empresa
-          const { data: surveyList } = await supabase
-            .from("surveys")
-            .select("*")
-            .eq("company_id", company.id)
-            .order("created_at", { ascending: false });
-
-          if (surveyList && surveyList.length > 0) {
-            setSurveys(surveyList);
-          } else {
-            // Se não houver pesquisa explícita no surveys, exibe a pesquisa institucional ativa com o slug da empresa
-            const companySlug = company.code_slug || encodeURIComponent(compName.toLowerCase().replace(/\s+/g, "_"));
-            const defaultSurvey: SurveyItem = {
-              id: company.id,
-              title: `Pesquisa de Saúde Feminina - ${compName}`,
-              token: companySlug,
-              status: "ativa",
-              created_at: company.created_at || new Date().toISOString(),
-            };
-            setSurveys([defaultSurvey]);
           }
         }
-      } catch (error) {
-        console.error("Erro ao carregar dados da empresa:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
 
-    fetchCompanyAndSurveys();
+        const parsedColabs: ColaboradoraRegistro[] = allRespostas.map((r: any, idx: number) => {
+          const p = r.user_id ? profilesMap[r.user_id] : null;
+          const respPayload = r.responses || r;
+          const nome = respPayload.nome || respPayload.full_name || p?.nome || (respPayload.email ? respPayload.email.split("@")[0].replace(/[._]/g, " ") : `Colaboradora #${idx + 1}`);
+          const email = respPayload.email || p?.email || `colaboradora.${idx + 1}@empresa.com`;
+          const resultadoRaw = respPayload.resultado || (r.diagnostico === "Sim" ? "Alta Probabilidade de Endometriose" : "Investigação Recomendada");
+
+          let nivel: "Alto" | "Médio" | "Moderado" | "Baixo" = "Baixo";
+          const rLower = String(resultadoRaw).toLowerCase();
+          if (rLower.includes("alta") || (Number(r.intensidade_dor || respPayload.intensidadeDor) >= 7 && (r.sintomas || respPayload.sintomas || []).length >= 3)) {
+            nivel = "Alto";
+          } else if (rLower.includes("moderada") || rLower.includes("médio") || Number(r.intensidade_dor || respPayload.intensidadeDor) >= 4) {
+            nivel = "Moderado";
+          } else {
+            nivel = "Baixo";
+          }
+
+          const finalResultado = nivel === "Alto"
+            ? "Fator Alto — Alta Probabilidade"
+            : nivel === "Moderado" || nivel === "Médio"
+            ? "Fator Médio / Moderado — Prob. Moderada"
+            : "Fator Baixo — Baixa Probabilidade";
+
+          return {
+            id: r.id || `colab_${idx}`,
+            nome,
+            email,
+            idade: r.idade || respPayload.idade || "25 - 34",
+            diagnosticoPrevio: r.diagnostico || respPayload.diagnostico,
+            resultado: finalResultado,
+            nivelProbabilidade: nivel,
+            intensidadeDor: r.intensidade_dor ?? respPayload.intensidadeDor ?? "—",
+            sintomas: r.sintomas || respPayload.sintomas || [],
+            impactoTrabalho: r.impacto_trabalho || respPayload.impactoTrabalho || "Moderado",
+            horasAusencia: r.horas_ausencia ?? respPayload.horasAusencia ?? 0,
+            diasAtestado: r.dias_atestado ?? respPayload.diasAtestado ?? 0,
+            dataResposta: r.created_at || r.dataResposta || new Date().toISOString(),
+          };
+        });
+
+        setColaboradoras(parsedColabs);
+
+        // Buscar pesquisas da empresa
+        const { data: surveyList } = await supabase
+          .from("surveys")
+          .select("*")
+          .eq("company_id", company.id)
+          .order("created_at", { ascending: false });
+
+        if (surveyList && surveyList.length > 0) {
+          setSurveys(surveyList);
+        } else {
+          const companySlug = company.code_slug || encodeURIComponent(compName.toLowerCase().replace(/\s+/g, "_"));
+          const defaultSurvey: SurveyItem = {
+            id: company.id,
+            title: `Pesquisa de Saúde Feminina - ${compName}`,
+            token: companySlug,
+            status: "ativa",
+            created_at: company.created_at || new Date().toISOString(),
+          };
+          setSurveys([defaultSurvey]);
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao carregar dados da empresa:", error);
+    } finally {
+      setLoading(false);
+      setRecarregando(false);
+      if (isManualRefresh) {
+        toast.success("Relatórios da empresa atualizados com sucesso!");
+      }
+    }
+  };
+
+  useEffect(() => {
+    carregarDadosCompletos();
+
+    // Ouvintes para manter os relatórios atualizados em tempo real
+    const refreshHandler = () => carregarDadosCompletos();
+    window.addEventListener("empresa_atualizada", refreshHandler);
+    window.addEventListener("nova_resposta_empresa", refreshHandler);
+    window.addEventListener("storage", refreshHandler);
+
+    return () => {
+      window.removeEventListener("empresa_atualizada", refreshHandler);
+      window.removeEventListener("nova_resposta_empresa", refreshHandler);
+      window.removeEventListener("storage", refreshHandler);
+    };
   }, []);
+
+  // Simular amostras de teste para a empresa atual
+  const handleSimularAmostras = () => {
+    if (!companyId) return;
+    const nomesExemplo = [
+      { nome: "Mariana Costa Silva", email: "mariana.silva@empresa.com", dor: 9, sintomas: ["colica_intensa", "dor_relacao", "dor_pelvica_cronica", "dor_lombar_pernas"], nivel: "Alto" as const, horas: 16, dias: 4 },
+      { nome: "Juliana Andrade Mota", email: "juliana.mota@empresa.com", dor: 8, sintomas: ["colica_intensa", "dor_intestino", "fadiga_extrema"], nivel: "Alto" as const, horas: 12, dias: 3 },
+      { nome: "Beatriz Oliveira Santos", email: "beatriz.santos@empresa.com", dor: 6, sintomas: ["colica_intensa", "ansiedade_dor"], nivel: "Moderado" as const, horas: 8, dias: 2 },
+      { nome: "Camila Rodrigues Lima", email: "camila.lima@empresa.com", dor: 5, sintomas: ["dor_pelvica_cronica"], nivel: "Moderado" as const, horas: 4, dias: 1 },
+      { nome: "Larissa Fernandes", email: "larissa.fernandes@empresa.com", dor: 2, sintomas: ["fadiga_extrema"], nivel: "Baixo" as const, horas: 0, dias: 0 },
+      { nome: "Fernanda Ribeiro", email: "fernanda.ribeiro@empresa.com", dor: 1, sintomas: [], nivel: "Baixo" as const, horas: 0, dias: 0 },
+    ];
+
+    const geradas: ColaboradoraRegistro[] = nomesExemplo.map((n, i) => ({
+      id: `simulada_${Date.now()}_${i}`,
+      nome: n.nome,
+      email: n.email,
+      idade: "25 - 34",
+      diagnosticoPrevio: n.nivel === "Alto" ? "Sim" : "Não",
+      resultado: n.nivel === "Alto" ? "Fator Alto — Alta Probabilidade" : n.nivel === "Moderado" ? "Fator Médio / Moderado — Prob. Moderada" : "Fator Baixo — Baixa Probabilidade",
+      nivelProbabilidade: n.nivel,
+      intensidadeDor: n.dor,
+      sintomas: n.sintomas,
+      impactoTrabalho: n.nivel === "Alto" ? "Severo" : n.nivel === "Moderado" ? "Moderado" : "Leve",
+      horasAusencia: n.horas,
+      diasAtestado: n.dias,
+      dataResposta: new Date(Date.now() - i * 86400000).toISOString(),
+    }));
+
+    const key = `respostas_empresa_${companyId}`;
+    localStorage.setItem(key, JSON.stringify(geradas));
+    setColaboradoras(geradas);
+    toast.success(`6 amostras de colaboradoras criadas para ${companyName}!`, {
+      description: "O relatório e os gráficos foram atualizados com sucesso.",
+    });
+  };
 
   // Criar nova pesquisa institucional (F5.2)
   const handleCriarPesquisa = async (e: React.FormEvent) => {
@@ -484,26 +592,49 @@ const EmpresaDashboard = () => {
         <Header />
       </div>
       
-      {/* Top Banner do Dashboard Institucional */}
-      <div className="bg-rose-blush py-10 px-4 border-b border-border print:bg-white print:border-none print:py-4">
+      {/* Top Banner do Dashboard Institucional com Destaque Máximo para a Empresa Ativa */}
+      <div className="bg-gradient-to-r from-rose-50 via-pink-soft to-rose-50 py-10 px-4 border-b border-rose-200/80 shadow-xs print:bg-white print:border-none print:py-4">
         <div className="container mx-auto max-w-6xl">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-white shadow-sm flex items-center justify-center border border-rose-200">
+              <div className="w-16 h-16 rounded-2xl bg-white shadow-md flex items-center justify-center border-2 border-primary/30 shrink-0">
                 <Building className="w-8 h-8 text-primary" />
               </div>
               <div>
-                <span className="text-xs font-bold text-secondary uppercase tracking-wider block">
-                  Área Protegida Institucional
-                </span>
-                <h1 className="font-display text-3xl font-bold text-foreground">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="text-xs font-bold text-secondary uppercase tracking-wider block">
+                    Painel Institucional de Saúde Feminina
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-primary text-white shadow-xs">
+                    Empresa Ativa
+                  </span>
+                </div>
+                <h1 className="font-display text-3xl md:text-4xl font-extrabold text-foreground tracking-tight">
                   {companyName || "Sua Empresa"}
                 </h1>
+                {companyCnpj && (
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5 flex items-center gap-2">
+                    <span><strong>CNPJ:</strong> {companyCnpj}</span>
+                    {companySetor && <span>• <strong>Setor:</strong> {companySetor}</span>}
+                  </p>
+                )}
               </div>
             </div>
             
-            {/* FILTRO POR BAIRRO + BOTÃO GERAR PDF */}
-            <div className="flex flex-wrap gap-3 print:hidden items-center">
+            {/* Ações, Filtro e Atualização */}
+            <div className="flex flex-wrap gap-2.5 print:hidden items-center">
+              {/* Botão de Atualizar Dados / Relatórios */}
+              <Button
+                onClick={() => carregarDadosCompletos(true)}
+                disabled={recarregando}
+                variant="outline"
+                className="border-primary text-primary hover:bg-rose-50 font-bold gap-1.5 shadow-sm rounded-xl"
+                title="Atualizar dados e recarregar os relatórios da empresa"
+              >
+                <RefreshCw className={`w-4 h-4 ${recarregando ? "animate-spin text-primary" : ""}`} />
+                {recarregando ? "Atualizando..." : "Atualizar Relatórios"}
+              </Button>
+
               {bairrosDisponiveis.length > 0 && (
                 <div className="flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-secondary shrink-0" />
@@ -519,20 +650,20 @@ const EmpresaDashboard = () => {
                   </select>
                 </div>
               )}
-              <Button onClick={() => setShowNovaPesquisa(!showNovaPesquisa)} variant="outline" className="border-secondary text-secondary font-bold">
+              <Button onClick={() => setShowNovaPesquisa(!showNovaPesquisa)} variant="outline" className="border-secondary text-secondary font-bold rounded-xl">
                 <Plus className="w-4 h-4 mr-1.5" /> Criar Pesquisa
               </Button>
               <Button
                 onClick={() => setShowTerminalModal(true)}
                 variant="outline"
-                className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-bold gap-1.5 shadow-sm"
+                className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-bold gap-1.5 shadow-sm rounded-xl"
               >
                 <Terminal className="w-4 h-4" /> Ver no Terminal
               </Button>
               <Button
                 onClick={handleGerarPdfConsolidado}
                 disabled={gerandoPdfConsolidado}
-                className="bg-secondary hover:bg-secondary/90 text-white font-bold gap-1.5 shadow-md"
+                className="bg-secondary hover:bg-secondary/90 text-white font-bold gap-1.5 shadow-md rounded-xl"
               >
                 {gerandoPdfConsolidado ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileDown className="w-4 h-4 mr-1.5" />}
                 {gerandoPdfConsolidado ? "Exportando..." : "Relatório Consolidado (PDF)"}
@@ -541,10 +672,21 @@ const EmpresaDashboard = () => {
                 onClick={() => setShowObsModal(true)}
                 disabled={gerandoPdf}
                 variant="outline"
-                className="border-rose-300 text-rose-800 hover:bg-rose-50 font-bold shadow-sm"
+                className="border-rose-300 text-rose-800 hover:bg-rose-50 font-bold shadow-sm rounded-xl"
               >
                 {gerandoPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-                {gerandoPdf ? "Gerando PDF..." : "Relatório Geral Agregado"}
+                {gerandoPdf ? "Gerando PDF..." : "Relatório Geral"}
+              </Button>
+
+              {/* Botão Sair da Conta da Empresa */}
+              <Button
+                onClick={handleSairConta}
+                variant="outline"
+                className="border-rose-300 text-rose-700 hover:bg-rose-100 font-bold gap-1.5 shadow-sm rounded-xl"
+                title="Sair da conta da instituição"
+              >
+                <LogOut className="w-4 h-4 text-rose-600" />
+                Sair da conta
               </Button>
             </div>
           </div>
@@ -652,7 +794,19 @@ const EmpresaDashboard = () => {
                     <p className="text-xs text-muted-foreground mt-0.5">{s.description || "Link ativo para preenchimento"}</p>
                   </div>
 
-                  <div className="flex items-center gap-2 w-full md:w-auto">
+                  <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <Button 
+                      onClick={() => {
+                        const link = `/pesquisa?empresa=${s.token}`;
+                        window.open(link, "_blank");
+                      }} 
+                      size="sm" 
+                      className="bg-primary hover:bg-rose-dark text-white font-bold text-xs gap-1.5 flex-1 md:flex-initial shadow-xs"
+                      title="Abrir o questionário para a colaboradora responder"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" /> Abrir Questionário
+                    </Button>
+
                     <Button onClick={() => copiarLinkExclusivo(s.token)} size="sm" variant="outline" className="border-rose-300 text-secondary font-bold text-xs gap-1.5 flex-1 md:flex-initial">
                       <Copy className="w-3.5 h-3.5" /> Copiar Link
                     </Button>
@@ -671,13 +825,13 @@ const EmpresaDashboard = () => {
             <div className="border-b border-rose-100 pb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <span className="text-xs font-bold text-secondary uppercase tracking-wider block flex items-center gap-1.5">
-                  <Users className="w-4 h-4" /> Gestão de Pessoas & RH Corporativo
+                  <Users className="w-4 h-4 text-primary" /> Gestão de Pessoas & RH Corporativo • {companyName || "Instituição"}
                 </span>
-                <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground mt-0.5">
-                  Relatório Consolidado de Colaboradoras
+                <h2 className="font-display text-2xl md:text-3xl font-extrabold text-foreground mt-0.5">
+                  Relatório Consolidado de Colaboradoras — {companyName || "Sua Empresa"}
                 </h2>
                 <p className="text-xs md:text-sm text-muted-foreground mt-1 max-w-2xl">
-                  Acompanhamento nominal de colaboradoras pesquisadas, diagnóstico por fator de probabilidade clínica (Alto, Moderado, Baixo) e diretrizes preventivas para o RH.
+                  Acompanhamento nominal de colaboradoras pesquisadas na instituição <strong className="text-foreground">{companyName}</strong>, diagnóstico por fator de probabilidade clínica (Alto, Moderado, Baixo) e diretrizes preventivas para o RH.
                 </p>
               </div>
 
@@ -782,19 +936,31 @@ const EmpresaDashboard = () => {
                           <td colSpan={6} className="p-10 text-center">
                             <div className="max-w-md mx-auto space-y-3">
                               <Users className="w-10 h-10 text-rose-300 mx-auto" />
-                              <h4 className="font-bold text-foreground text-sm">Nenhuma colaboradora respondeu ainda</h4>
+                              <h4 className="font-bold text-foreground text-sm">
+                                Nenhuma colaboradora respondeu ainda para {companyName || "sua empresa"}
+                              </h4>
                               <p className="text-xs text-muted-foreground">
-                                Compartilhe o link exclusivo da instituição acima para que as funcionárias possam responder à triagem com total confidencialidade.
+                                Compartilhe o link exclusivo da instituição acima para que as funcionárias possam responder à triagem com total confidencialidade, ou gere amostras de demonstração para testar este relatório.
                               </p>
-                              {surveys[0] && (
+                              <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                                {surveys[0] && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => copiarLinkExclusivo(surveys[0].token)}
+                                    className="bg-secondary text-white font-bold text-xs gap-1.5 rounded-xl shadow-xs"
+                                  >
+                                    <Copy className="w-3.5 h-3.5" /> Copiar Link da Empresa
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
-                                  onClick={() => copiarLinkExclusivo(surveys[0].token)}
-                                  className="bg-secondary text-white font-bold text-xs gap-1.5 rounded-xl"
+                                  variant="outline"
+                                  onClick={handleSimularAmostras}
+                                  className="border-primary text-primary hover:bg-rose-50 font-bold text-xs gap-1.5 rounded-xl"
                                 >
-                                  <Copy className="w-3.5 h-3.5" /> Copiar Link Exclusivo da Empresa
+                                  <Sparkles className="w-3.5 h-3.5" /> Gerar Amostras de Demonstração
                                 </Button>
-                              )}
+                              </div>
                             </div>
                           </td>
                         </tr>
@@ -913,8 +1079,8 @@ const EmpresaDashboard = () => {
                 <span className="text-xs font-bold text-secondary uppercase tracking-wider block">
                   RELATÓRIO INSTITUCIONAL AGREGADO
                 </span>
-                <h2 className="font-display text-2xl md:text-3xl font-bold text-foreground">
-                  Resultados Consolidados de Saúde Feminina
+                <h2 className="font-display text-2xl md:text-3xl font-extrabold text-foreground">
+                  Resultados Consolidados de Saúde Feminina — {companyName || "Sua Empresa"}
                 </h2>
                 {bairroFiltro && (
                   <span className="inline-flex items-center gap-1 mt-1 text-xs font-bold text-secondary bg-rose-50 px-3 py-1 rounded-full border border-rose-200">

@@ -58,6 +58,51 @@ export const QuestionarioIndividualModal = ({
   const [hasExistingResponse, setHasExistingResponse] = useState(false);
   const [existingResponseId, setExistingResponseId] = useState<string | null>(null);
   const [dataHoraRealizacao, setDataHoraRealizacao] = useState<string>("");
+  const [targetCompanyId, setTargetCompanyId] = useState<string | null>(null);
+  const [targetCompanyName, setTargetCompanyName] = useState<string>("");
+
+  // Resolver empresa vinculada (pelo token da prop ou da URL)
+  useEffect(() => {
+    const resolveEmpresa = async () => {
+      const search = typeof window !== "undefined" ? window.location.search : "";
+      const searchParams = new URLSearchParams(search);
+      const token = empresaToken || searchParams.get("empresa") || searchParams.get("token") || searchParams.get("c") || "";
+      if (!token) return;
+
+      try {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
+        if (isUuid) {
+          const { data: c } = await supabase.from("companies").select("id, name, nome_empresa").eq("id", token).maybeSingle();
+          if (c) {
+            setTargetCompanyId(c.id);
+            setTargetCompanyName(c.name || c.nome_empresa || "Empresa");
+            return;
+          }
+        }
+        const { data: cBySlug } = await supabase.from("companies").select("id, name, nome_empresa").eq("code_slug", token).maybeSingle();
+        if (cBySlug) {
+          setTargetCompanyId(cBySlug.id);
+          setTargetCompanyName(cBySlug.name || cBySlug.nome_empresa || token);
+          return;
+        }
+        const { data: s } = await supabase.from("surveys").select("id, company_id, title").eq("token", token).maybeSingle();
+        if (s?.company_id) {
+          const { data: c } = await supabase.from("companies").select("id, name, nome_empresa").eq("id", s.company_id).maybeSingle();
+          if (c) {
+            setTargetCompanyId(c.id);
+            setTargetCompanyName(c.name || c.nome_empresa || s.title);
+            return;
+          }
+        }
+        setTargetCompanyId(token);
+        setTargetCompanyName(token);
+      } catch (err) {
+        console.warn("Aviso ao resolver empresa no modal:", err);
+      }
+    };
+
+    resolveEmpresa();
+  }, [empresaToken, isOpen]);
 
   // Estados do Questionário de Triagem
   const [currentStep, setCurrentStep] = useState(1);
@@ -349,6 +394,8 @@ export const QuestionarioIndividualModal = ({
         localidade,
         email: userEmail,
         empresa_token: empresaToken || null,
+        company_id: targetCompanyId || null,
+        empresa_nome: targetCompanyName || null,
         diagnostico,
         sintomas: sintomasSelecionados,
         intensidadeDor,
@@ -362,36 +409,90 @@ export const QuestionarioIndividualModal = ({
       };
 
       const trabalhaBool = trabalha === "Sim" || trabalha === true || String(trabalha).toLowerCase() === "sim";
+      let insertedId: string | null = null;
 
-      // 2. Gravar no Supabase
-      const { data: insertedData, error: insertError } = await supabase
-        .from("survey_responses")
-        .insert([{
-          survey_id: DEFAULT_SURVEY_ID,
-          user_id: userId,
-          idade: idade || "25 - 34",
-          cidade: cidade || "São Paulo",
-          bairro: bairro || "",
-          estado: uf || "SP",
-          diagnostico: diagnostico || "Não",
-          sintomas: sintomasSelecionados,
-          intensidade_dor: Number(intensidadeDor) || 0,
-          trabalha: trabalhaBool, // boolean no Supabase
-          impacto_trabalho: impactoTrabalho || "Moderado",
-          horas_ausencia: Number(horasAusencia) || 0,
-          responses: payload,
-          status: "concluida",
-        }])
-        .select("id")
-        .single();
+      // 2. Gravar no Supabase via RPC SECURITY DEFINER (compatível com RLS)
+      try {
+        const { data: rpcData, error: rpcError } = await supabase.rpc("submit_survey_response", {
+          p_survey_id: DEFAULT_SURVEY_ID,
+          p_company_id: targetCompanyId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetCompanyId) ? targetCompanyId : null,
+          p_responses: payload,
+        });
 
-      if (insertError) {
-        console.warn("Aviso na gravação Supabase:", insertError);
+        if (!rpcError && rpcData?.response_id) {
+          insertedId = rpcData.response_id;
+        }
+      } catch (err) {
+        console.warn("Aviso na chamada RPC submit_survey_response:", err);
       }
 
-      // 3. Salvar no localStorage SOMENTE com chave específica deste participante
+      // Tentar também insert direto complementar
+      try {
+        const { data: directData } = await supabase
+          .from("survey_responses")
+          .insert([{
+            survey_id: DEFAULT_SURVEY_ID,
+            company_id: targetCompanyId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetCompanyId) ? targetCompanyId : null,
+            user_id: userId,
+            idade: idade || "25 - 34",
+            cidade: cidade || "São Paulo",
+            bairro: bairro || "",
+            estado: uf || "SP",
+            diagnostico: diagnostico || "Não",
+            sintomas: sintomasSelecionados,
+            intensidade_dor: Number(intensidadeDor) || 0,
+            trabalha: trabalhaBool,
+            impacto_trabalho: impactoTrabalho || "Moderado",
+            horas_ausencia: Number(horasAusencia) || 0,
+            responses: payload,
+            status: "concluida",
+          }])
+          .select("id")
+          .maybeSingle();
+
+        if (directData?.id) insertedId = directData.id;
+      } catch (insertErr) {
+        console.warn("Aviso insert direto survey_responses:", insertErr);
+      }
+
+      // 3. Salvar no localStorage da participante
       if (userEmail) {
         localStorage.setItem(`survey_response_${userEmail.toLowerCase()}`, JSON.stringify(payload));
+      }
+      localStorage.setItem(`survey_response_${userId}`, JSON.stringify(payload));
+
+      // 4. Salvar e sincronizar no repositório compartilhado da empresa para atualização imediata dos relatórios
+      if (targetCompanyId) {
+        try {
+          const colabEntry = {
+            id: insertedId || `colab_${Date.now()}`,
+            nome: userEmail ? userEmail.split("@")[0].replace(/[._]/g, " ") : "Colaboradora",
+            email: userEmail || "colaboradora@empresa.com",
+            idade: idade || "25 - 34",
+            diagnosticoPrevio: diagnostico,
+            resultado: calcularResultado().nivel,
+            nivelProbabilidade: calcularResultado().nivel.toLowerCase().includes("alta") ? "Alto" : calcularResultado().nivel.toLowerCase().includes("mod") ? "Moderado" : "Baixo",
+            intensidadeDor: intensidadeDor,
+            sintomas: sintomasSelecionados,
+            impactoTrabalho: impactoTrabalho,
+            horasAusencia: horasAusencia,
+            diasAtestado: diasAtestado,
+            dataResposta: nowIso,
+            company_id: targetCompanyId,
+            responses: payload,
+          };
+
+          const key = `respostas_empresa_${targetCompanyId}`;
+          const currentList = JSON.parse(localStorage.getItem(key) || "[]");
+          currentList.unshift(colabEntry);
+          localStorage.setItem(key, JSON.stringify(currentList));
+
+          // Notificar abas abertas e componentes de relatório
+          window.dispatchEvent(new CustomEvent("nova_resposta_empresa", { detail: colabEntry }));
+          window.dispatchEvent(new Event("empresa_atualizada"));
+        } catch (e) {
+          console.warn("Aviso ao sincronizar resposta da empresa:", e);
+        }
       }
       localStorage.setItem(`survey_response_${userId}`, JSON.stringify(payload));
 
@@ -817,6 +918,34 @@ export const QuestionarioIndividualModal = ({
                   </p>
                   <p className="leading-relaxed">{resultado.recomendacao}</p>
                 </div>
+              </div>
+
+              {/* SINTOMAS RELATADOS NO QUESTIONÁRIO (Exibição idêntica ao questionário) */}
+              <div className="bg-white rounded-2xl p-4 sm:p-5 border border-rose-200 shadow-sm space-y-3 text-left">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-rose-100 pb-2 gap-1">
+                  <h4 className="font-bold text-xs sm:text-sm text-foreground flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-primary" /> Sintomas e Situações Relatadas no Questionário ({sintomasSelecionados.length})
+                  </h4>
+                  <span className="text-[11px] text-secondary font-bold bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200 self-start sm:self-auto">
+                    Formato original da pesquisa
+                  </span>
+                </div>
+                {sintomasSelecionados.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">Nenhum sintoma específico marcado.</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {sintomasSelecionados.map((sId) => {
+                      const item = sintomasTriagem.find(x => x.id === sId);
+                      const label = item?.label || sId;
+                      return (
+                        <div key={sId} className="flex items-start gap-2 p-2.5 rounded-xl bg-rose-50/70 border border-rose-200 text-xs text-foreground font-medium shadow-xs">
+                          <span className="w-3.5 h-3.5 rounded-full bg-secondary text-white flex items-center justify-center shrink-0 mt-0.5 text-[9px] font-bold">✓</span>
+                          <span className="leading-snug">{label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Data e Hora da Pesquisa Realizada */}

@@ -20,6 +20,27 @@ const CORES = {
   verdeEscuro: [30, 100, 60] as [number, number, number],
 };
 
+// ─── Mapeamento fiel dos sintomas do questionário ───────────────────────────
+export const MAPA_SINTOMAS_QUESTIONARIO: Record<string, string> = {
+  colica_intensa: "Cólicas menstruais muito intensas que impedem atividades normais",
+  dor_relacao: "Dor profunda durante ou após relações sexuais (dispareunia)",
+  dor_pelvica_cronica: "Dor pélvica ou abdominal contínua mesmo fora da menstruação",
+  dor_intestino: "Dor ao evacuar, diarreia, constipação ou distensão abdominal no período menstrual",
+  dor_xixi: "Dor, ardência ou sangramento ao urinar durante a menstruação",
+  historico_familiar: "Mãe, irmã ou parente de 1º grau diagnosticada com endometriose",
+  dificuldade_engravidar: "Dificuldade para engravidar há mais de 6 a 12 meses",
+  dor_lombar_pernas: "Dor na região lombar ou irradiada para as pernas no período menstrual",
+  uso_analgesicos: "Necessidade de tomar analgésicos fortes ou injeções frequentemente para conter a dor",
+  historico_cistos: "Histórico de cistos ovarianos, miomas ou cirurgias pélvicas prévias",
+  fadiga_extrema: "Fadiga crônica, exaustão física e tonturas sem causa aparente",
+  ansiedade_dor: "Ansiedade, estresse ou impacto emocional devido às dores crônicas",
+};
+
+export const formatarSintomaQuestionario = (s: string): string => {
+  if (!s) return "";
+  return MAPA_SINTOMAS_QUESTIONARIO[s] || s;
+};
+
 // ─── Tipos públicos ───────────────────────────────────────────────────────────
 export interface DadosIndividuais {
   resultado: string;
@@ -573,29 +594,31 @@ export async function gerarRelatorioIndividual(dados: DadosIndividuais): Promise
   cardMetrica(doc, MARGIN + (cW + 4) * 2, y, cW, "Horas/mês c/ dor", `${dados.horasAusencia}h`, `${dados.diasAtestado} dias atestado/ano`);
   y += 32;
 
-  // Sintomas
+  // Sintomas e Situações Relatadas no Questionário
   if (dados.sintomas.length > 0) {
     setColor(doc, CORES.preto, "text");
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
-    doc.text("Sintomas que você relatou:", MARGIN, y);
+    doc.text("Sintomas e Situações Relatadas no Questionário:", MARGIN, y);
     y += 5;
 
-    const colW = CONTENT_W / 2 - 3;
-    dados.sintomas.forEach((s, i) => {
-      const col = i % 2;
-      const row = Math.floor(i / 2);
-      const xTag = MARGIN + col * (colW + 6);
-      const yTag = y + row * 11;
+    dados.sintomas.forEach((s) => {
+      const rotulo = MAPA_SINTOMAS_QUESTIONARIO[s] || s;
       setColor(doc, CORES.palido, "fill");
-      doc.roundedRect(xTag, yTag, colW, 9, 2, 2, "F");
+      setColor(doc, CORES.rose || CORES.paleRosa, "stroke");
+      doc.setLineWidth(0.3);
+
+      const lines = doc.splitTextToSize(`• ${rotulo}`, CONTENT_W - 8);
+      const boxH = Math.max(lines.length * 4.2 + 3.5, 7.5);
+
+      doc.roundedRect(MARGIN, y, CONTENT_W, boxH, 1.5, 1.5, "FD");
       setColor(doc, CORES.vinho, "text");
-      doc.setFontSize(7.5);
+      doc.setFontSize(7.2);
       doc.setFont("helvetica", "normal");
-      const label = s.length > 35 ? s.slice(0, 35) + "…" : s;
-      doc.text(label, xTag + 4, yTag + 6);
+      doc.text(lines, MARGIN + 4, y + 4.8);
+      y += boxH + 2;
     });
-    y += Math.ceil(dados.sintomas.length / 2) * 11 + 6;
+    y += 4;
   }
 
   // Aviso

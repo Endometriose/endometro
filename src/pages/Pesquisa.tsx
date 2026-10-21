@@ -302,7 +302,7 @@ const Pesquisa = () => {
       setHasExistingResponse(false);
       setExistingResponseId(null);
       setDataHoraRealizacao("");
-      if (activeTab === "triagem" && !empresaToken) {
+      if (activeTab === "triagem") {
         setIsLoginModalOpen(true);
       }
     }
@@ -557,6 +557,8 @@ const Pesquisa = () => {
 
       const trabalhaBool = trabalha === "Sim" || trabalha === true || String(trabalha).toLowerCase() === "sim";
 
+      let insertedId: string | null = existingResponseId;
+
       if (existingResponseId) {
         // Atualizar resposta existente
         const { error } = await supabase
@@ -570,26 +572,49 @@ const Pesquisa = () => {
 
         if (error) console.warn("Aviso ao atualizar:", error.message);
       } else {
-        const { data: insertedData, error } = await supabase.from("survey_responses").insert([{
-          survey_id: DEFAULT_SURVEY_ID,
-          company_id: targetCompanyId,
-          user_id: userId,
-          idade: idade || "25 - 34",
-          cidade: cidade || "São Paulo",
-          bairro: bairro || "",
-          estado: uf || "SP",
-          diagnostico: diagnostico || "Não",
-          sintomas: sintomasSelecionados,
-          intensidade_dor: Number(intensidadeDor) || 0,
-          trabalha: trabalhaBool, // boolean no Supabase
-          impacto_trabalho: impactoTrabalho || "Moderado",
-          horas_ausencia: Number(horasAusencia) || 0,
-          responses: payload,
-          status: "concluida",
-        }]).select("id").single();
+        // Gravar no Supabase via RPC SECURITY DEFINER (compatível com RLS)
+        try {
+          const { data: rpcData, error: rpcError } = await supabase.rpc("submit_survey_response", {
+            p_survey_id: DEFAULT_SURVEY_ID,
+            p_company_id: targetCompanyId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetCompanyId) ? targetCompanyId : null,
+            p_responses: payload,
+          });
 
-        if (error) console.warn("Aviso ao gravar no Supabase:", error.message);
-        if (insertedData) setExistingResponseId(insertedData.id);
+          if (!rpcError && rpcData?.response_id) {
+            insertedId = rpcData.response_id;
+            setExistingResponseId(insertedId);
+          }
+        } catch (err) {
+          console.warn("Aviso RPC submit_survey_response em Pesquisa:", err);
+        }
+
+        // Tentar também insert direto
+        try {
+          const { data: insertedData } = await supabase.from("survey_responses").insert([{
+            survey_id: DEFAULT_SURVEY_ID,
+            company_id: targetCompanyId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetCompanyId) ? targetCompanyId : null,
+            user_id: userId,
+            idade: idade || "25 - 34",
+            cidade: cidade || "São Paulo",
+            bairro: bairro || "",
+            estado: uf || "SP",
+            diagnostico: diagnostico || "Não",
+            sintomas: sintomasSelecionados,
+            intensidade_dor: Number(intensidadeDor) || 0,
+            trabalha: trabalhaBool,
+            impacto_trabalho: impactoTrabalho || "Moderado",
+            horas_ausencia: Number(horasAusencia) || 0,
+            responses: payload,
+            status: "concluida",
+          }]).select("id").maybeSingle();
+
+          if (insertedData?.id) {
+            insertedId = insertedData.id;
+            setExistingResponseId(insertedId);
+          }
+        } catch (error: any) {
+          console.warn("Aviso ao gravar insert direto:", error?.message);
+        }
       }
 
       // Salvar backup persistente no localStorage apenas para este participante
@@ -598,6 +623,40 @@ const Pesquisa = () => {
       }
       if (userId) {
         localStorage.setItem(`survey_response_${userId}`, JSON.stringify(payload));
+      }
+
+      // Sincronizar no repositório compartilhado da empresa para atualização imediata dos relatórios
+      if (targetCompanyId) {
+        try {
+          const colabEntry = {
+            id: insertedId || `colab_${Date.now()}`,
+            nome: emailParticipante ? emailParticipante.split("@")[0].replace(/[._]/g, " ") : "Colaboradora",
+            email: emailParticipante || "colaboradora@empresa.com",
+            idade: idade || "25 - 34",
+            diagnosticoPrevio: diagnostico,
+            resultado: calcularResultado().nivel,
+            nivelProbabilidade: calcularResultado().nivel.toLowerCase().includes("alta") ? "Alto" : calcularResultado().nivel.toLowerCase().includes("mod") ? "Moderado" : "Baixo",
+            intensidadeDor: intensidadeDor,
+            sintomas: sintomasSelecionados,
+            impactoTrabalho: impactoTrabalho,
+            horasAusencia: horasAusencia,
+            diasAtestado: diasAtestado,
+            dataResposta: new Date().toISOString(),
+            company_id: targetCompanyId,
+            responses: payload,
+          };
+
+          const key = `respostas_empresa_${targetCompanyId}`;
+          const currentList = JSON.parse(localStorage.getItem(key) || "[]");
+          currentList.unshift(colabEntry);
+          localStorage.setItem(key, JSON.stringify(currentList));
+
+          // Notificar abas abertas e painéis de empresa
+          window.dispatchEvent(new CustomEvent("nova_resposta_empresa", { detail: colabEntry }));
+          window.dispatchEvent(new Event("empresa_atualizada"));
+        } catch (e) {
+          console.warn("Aviso ao sincronizar resposta da empresa:", e);
+        }
       }
 
       // Invalidar cache de indicadores e panorama para atualizar os gráficos em tempo real
@@ -783,7 +842,32 @@ const Pesquisa = () => {
         password: senhaEmpresa,
       });
       if (error) throw new Error("E-mail ou senha incorretos.");
-      toast.success("Login realizado com sucesso!");
+
+      // Localizar empresa correspondente para cache imediato
+      let compNome = "Sua Empresa";
+      let compId = "";
+      let compSlug = "";
+
+      if (data?.user) {
+        const { data: comp } = await supabase
+          .from("companies")
+          .select("id, name, nome_empresa, code_slug")
+          .or(`contact_email.ilike.${cleanEmail},user_id.eq.${data.user.id}`)
+          .limit(1)
+          .maybeSingle();
+
+        if (comp) {
+          compId = comp.id;
+          compNome = comp.name || comp.nome_empresa || "Sua Empresa";
+          compSlug = comp.code_slug || "";
+          sessionStorage.setItem("empresa_ativa", JSON.stringify({ id: compId, name: compNome, code_slug: compSlug }));
+          window.dispatchEvent(new Event("empresa_atualizada"));
+        }
+      }
+
+      toast.success(`Bem-vindo ao Painel da Empresa!`, {
+        description: `Instituição: ${compNome}`,
+      });
       navigate("/banco-de-dados");
     } catch (err: any) {
       toast.error(err.message || "Erro ao fazer login.");
@@ -997,15 +1081,17 @@ const Pesquisa = () => {
                             <button
                               type="button"
                               onClick={async () => {
+                                sessionStorage.removeItem("empresa_ativa");
                                 await supabase.auth.signOut();
                                 setCurrentUser(null);
                                 setHasExistingResponse(false);
                                 setExistingResponseId(null);
+                                window.dispatchEvent(new Event("empresa_atualizada"));
                                 setIsLoginModalOpen(true);
                               }}
-                              className="text-xs text-primary hover:underline font-bold ml-2"
+                              className="text-xs text-primary hover:underline font-bold ml-2 cursor-pointer"
                             >
-                              (Trocar conta)
+                              (Trocar conta / Sair)
                             </button>
                           </div>
                         </div>
@@ -1281,6 +1367,34 @@ const Pesquisa = () => {
                       </div>
                     </div>
 
+                    {/* SINTOMAS RELATADOS NO QUESTIONÁRIO (Exibição idêntica ao questionário) */}
+                    <div className="bg-white rounded-2xl p-5 border border-rose-200 shadow-sm space-y-3 text-left">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-rose-100 pb-2 gap-1">
+                        <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-primary" /> Sintomas e Situações Relatadas no Questionário ({sintomasSelecionados.length})
+                        </h4>
+                        <span className="text-xs text-secondary font-bold bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200 self-start sm:self-auto">
+                          Formato original da pesquisa
+                        </span>
+                      </div>
+                      {sintomasSelecionados.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic">Nenhum sintoma específico marcado.</p>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          {sintomasSelecionados.map((sId) => {
+                            const item = sintomasTriagem.find(x => x.id === sId);
+                            const label = item?.label || sId;
+                            return (
+                              <div key={sId} className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-50/70 border border-rose-200 text-xs text-foreground font-medium shadow-xs">
+                                <span className="w-4 h-4 rounded-full bg-secondary text-white flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold">✓</span>
+                                <span className="leading-snug">{label}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
                     {/* Data e Hora da Pesquisa Realizada */}
                     {hasExistingResponse && (
                       <div className="p-4 rounded-2xl bg-rose-50/80 border border-rose-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs sm:text-sm">
@@ -1552,6 +1666,9 @@ const Pesquisa = () => {
           setIsLoginModalOpen(false);
           checkUserAndLoadData();
         }}
+        empresaToken={empresaToken}
+        empresaNome={empresaInfo?.name}
+        defaultTab="cadastrar"
       />
 
       {/* Modal de Acesso e Confirmação da Empresa */}

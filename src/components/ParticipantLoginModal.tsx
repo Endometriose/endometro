@@ -14,18 +14,24 @@ interface ParticipantLoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  empresaToken?: string;
+  empresaNome?: string;
+  defaultTab?: "cadastrar" | "entrar";
 }
 
 export const ParticipantLoginModal = ({
   isOpen,
   onClose,
   onSuccess,
+  empresaToken = "",
+  empresaNome = "",
+  defaultTab = "cadastrar",
 }: ParticipantLoginModalProps) => {
   const navigate = useNavigate();
 
   // "participante" | "instituicao"
   const [role, setRole] = useState<"participante" | "instituicao">("participante");
-  const [activeTab, setActiveTab] = useState<"entrar" | "cadastrar" | "esqueci">("entrar");
+  const [activeTab, setActiveTab] = useState<"entrar" | "cadastrar" | "esqueci">(defaultTab);
 
   // Form states
   const [email, setEmail] = useState("");
@@ -52,11 +58,11 @@ export const ParticipantLoginModal = ({
       setCnpj("");
       setSetor("");
       setTermosLgpd(false);
-      setActiveTab("entrar");
+      setActiveTab(defaultTab || "cadastrar");
       setRole("participante");
       setIsSubmitting(false);
     }
-  }, [isOpen]);
+  }, [isOpen, defaultTab]);
 
   const formatCnpj = (value: string) => {
     const digits = value.replace(/\D/g, "").slice(0, 14);
@@ -362,30 +368,38 @@ export const ParticipantLoginModal = ({
           </p>
         </div>
 
-        {/* 3. Sub-tabs Entrar vs Criar Conta */}
+        {/* Destaque de vínculo com empresa se houver token */}
+        {(empresaNome || empresaToken) && (
+          <div className="mb-4 p-2.5 rounded-2xl bg-pink-soft border border-rose-200 text-center text-xs font-bold text-secondary flex items-center justify-center gap-2">
+            <Building2 className="w-4 h-4 text-primary shrink-0" />
+            <span>Pesquisa Vinculada: <strong>{empresaNome || empresaToken}</strong></span>
+          </div>
+        )}
+
+        {/* 3. Sub-tabs Cadastro em Destaque vs Entrar */}
         {activeTab !== "esqueci" && (
-          <div className="bg-rose-blush/40 p-1 rounded-xl flex gap-1 mb-5 border border-rose-200/40">
+          <div className="bg-rose-blush/40 p-1.5 rounded-2xl flex gap-1 mb-5 border border-rose-200/50">
+            <button
+              type="button"
+              onClick={() => setActiveTab("cadastrar")}
+              className={`flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all ${
+                activeTab === "cadastrar"
+                  ? "bg-secondary text-white shadow-sm ring-1 ring-secondary/40 font-extrabold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Criar conta (Cadastro)
+            </button>
             <button
               type="button"
               onClick={() => setActiveTab("entrar")}
-              className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all ${
+              className={`flex-1 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all ${
                 activeTab === "entrar"
-                  ? "bg-white text-foreground shadow-xs"
+                  ? "bg-white text-foreground shadow-xs font-extrabold"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
               Entrar
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("cadastrar")}
-              className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all ${
-                activeTab === "cadastrar"
-                  ? "bg-white text-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Criar conta
             </button>
           </div>
         )}

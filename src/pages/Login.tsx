@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Eye, EyeOff, Building2, UserCheck, KeyRound, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, Building2, UserCheck, KeyRound, ArrowLeft, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { ModalAcessoEmpresa } from "@/components/ModalAcessoEmpresa";
@@ -27,7 +27,8 @@ const Login = () => {
   const initialTipo = searchParams.get("tipo") === "instituicao" ? "instituicao" : "participante";
 
   const [role, setRole] = useState<"participante" | "instituicao">(initialTipo);
-  const [activeTab, setActiveTab] = useState<"entrar" | "cadastrar" | "esqueci">("entrar");
+  const [activeTab, setActiveTab] = useState<"entrar" | "cadastrar" | "esqueci">("cadastrar");
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   // Estados dos Formulários
   const [email, setEmail] = useState("");
@@ -38,6 +39,25 @@ const Login = () => {
   const [setor, setSetor] = useState("");
   const [termosLgpd, setTermosLgpd] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Checar usuário atual conectado
+  useState(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) setCurrentUser(data.user);
+    });
+  });
+
+  const handleSairConta = async () => {
+    try {
+      sessionStorage.removeItem("empresa_ativa");
+      await supabase.auth.signOut();
+      setCurrentUser(null);
+      window.dispatchEvent(new Event("empresa_atualizada"));
+      toast.success("Você saiu da conta.");
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   // Estados do Modal da Empresa
   const [showModalEmpresa, setShowModalEmpresa] = useState(false);
@@ -326,6 +346,27 @@ const Login = () => {
             </p>
           </div>
 
+          {/* Botão Sair da Conta se já estiver conectado */}
+          {currentUser && (
+            <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shadow-xs">
+              <div>
+                <span className="font-bold text-foreground block">Conta conectada no momento:</span>
+                <span className="text-secondary font-extrabold text-sm">{currentUser.email}</span>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleSairConta}
+                className="border-rose-300 text-rose-700 hover:bg-rose-100 font-bold gap-1.5 rounded-xl self-end sm:self-auto cursor-pointer"
+                title="Sair desta conta para logar em outra"
+              >
+                <LogOut className="w-3.5 h-3.5 text-rose-600" />
+                Sair da conta
+              </Button>
+            </div>
+          )}
+
           {activeTab === "esqueci" ? (
             /* FLUXO DE ESQUECI MINHA SENHA */
             <form onSubmit={handleEsqueciSenha} className="space-y-5 animate-fade-in">
@@ -359,14 +400,20 @@ const Login = () => {
               </button>
             </form>
           ) : (
-            /* TABS: ENTRAR x CRIAR CONTA */
+            /* TABS: CRIAR CONTA (CADASTRO EM DESTAQUE) x ENTRAR */
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6 bg-muted/60 p-1 rounded-2xl">
-                <TabsTrigger value="entrar" className="rounded-xl font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                  Entrar
+              <TabsList className="grid w-full grid-cols-2 mb-6 bg-rose-blush/50 p-1.5 rounded-2xl border border-rose-200">
+                <TabsTrigger 
+                  value="cadastrar" 
+                  className="rounded-xl font-extrabold py-2.5 data-[state=active]:bg-secondary data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:ring-1 data-[state=active]:ring-secondary/40 transition-all text-xs md:text-sm"
+                >
+                  Criar conta (Cadastro)
                 </TabsTrigger>
-                <TabsTrigger value="cadastrar" className="rounded-xl font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                  Criar conta
+                <TabsTrigger 
+                  value="entrar" 
+                  className="rounded-xl font-extrabold py-2.5 data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-xs transition-all text-xs md:text-sm"
+                >
+                  Entrar
                 </TabsTrigger>
               </TabsList>
 

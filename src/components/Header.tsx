@@ -1,16 +1,76 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Instagram, Mail, Youtube, Facebook, Menu, Maximize, Minimize, ChevronDown } from "lucide-react";
+import { Instagram, Mail, Youtube, Facebook, Menu, Maximize, Minimize, ChevronDown, Building2, Eye, ShieldCheck, PhoneCall, LogOut } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { supabase } from "@/lib/supabase";
 
 const Header = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState("");
+  const [activeCompanyName, setActiveCompanyName] = useState<string>("");
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Detecta se está no contexto da empresa (login, cadastro, dashboard ou empresa ativa)
+  const isEmpresaContext = 
+    location.pathname === "/banco-de-dados" ||
+    (location.pathname === "/pesquisa" && location.search.includes("tab=empresa")) ||
+    location.pathname === "/login" ||
+    Boolean(activeCompanyName && (location.pathname === "/banco-de-dados" || location.pathname === "/pesquisa"));
+
+  // Carrega nome da empresa ativa na sessão
+  useEffect(() => {
+    const resolveCompany = async () => {
+      try {
+        const raw = sessionStorage.getItem("empresa_ativa");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.name) {
+            setActiveCompanyName(parsed.name);
+            return;
+          }
+        }
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: prof } = await supabase.from("profiles").select("company_id, full_name, nome").eq("id", user.id).maybeSingle();
+          if (prof?.company_id) {
+            const { data: comp } = await supabase.from("companies").select("name, nome_empresa").eq("id", prof.company_id).maybeSingle();
+            if (comp) {
+              const compName = comp.name || comp.nome_empresa || "Empresa";
+              setActiveCompanyName(compName);
+              sessionStorage.setItem("empresa_ativa", JSON.stringify({ id: comp.id, name: compName }));
+              return;
+            }
+          }
+          if (user.email) {
+            const { data: compByEmail } = await supabase.from("companies").select("id, name, nome_empresa").ilike("contact_email", user.email).maybeSingle();
+            if (compByEmail) {
+              const compName = compByEmail.name || compByEmail.nome_empresa || "Empresa";
+              setActiveCompanyName(compName);
+              sessionStorage.setItem("empresa_ativa", JSON.stringify({ id: compByEmail.id, name: compName }));
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Aviso ao carregar empresa ativa no Header:", e);
+      }
+    };
+
+    resolveCompany();
+
+    const storageListener = () => resolveCompany();
+    window.addEventListener("storage", storageListener);
+    window.addEventListener("empresa_atualizada", storageListener);
+    return () => {
+      window.removeEventListener("storage", storageListener);
+      window.removeEventListener("empresa_atualizada", storageListener);
+    };
+  }, [location.pathname, location.search]);
 
   // Observer para Scrollspy (marcar menu ativo e animar entrada de seções)
   useEffect(() => {
@@ -21,7 +81,6 @@ const Header = () => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           setActiveSection(entry.target.id);
-          // Animação de entrada (se houver classe para isso)
           entry.target.classList.add("section-visible");
         }
       });
@@ -151,7 +210,53 @@ const Header = () => {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Link to="/#contato" onClick={(e) => handleLinkClick(e as any, "/#contato")} className={linkClass(mobile, "/#contato")}>Contato</Link>
+      {/* Nome destacado da Empresa no Menu para máxima visibilidade e botão para sair */}
+      {activeCompanyName && (
+        <div className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-rose-100 to-rose-50 border border-rose-300 rounded-full text-xs font-bold text-secondary shadow-xs">
+          <Building2 className="w-4 h-4 text-primary shrink-0" />
+          <span className="truncate max-w-[180px]" title={`Empresa ativa: ${activeCompanyName}`}>
+            {activeCompanyName}
+          </span>
+          <span className="text-[10px] bg-white/90 text-rose-800 px-1.5 py-0.2 rounded font-semibold ml-0.5">
+            Ativa
+          </span>
+          <button
+            type="button"
+            onClick={async () => {
+              sessionStorage.removeItem("empresa_ativa");
+              await supabase.auth.signOut();
+              setActiveCompanyName("");
+              window.dispatchEvent(new Event("empresa_atualizada"));
+              navigate("/");
+            }}
+            className="text-[11px] text-rose-700 hover:text-rose-900 font-extrabold flex items-center gap-0.5 hover:underline ml-1 pl-1 border-l border-rose-200 cursor-pointer"
+            title="Sair da conta da empresa"
+          >
+            <LogOut className="w-3 h-3" /> Sair
+          </button>
+        </div>
+      )}
+
+      {/* Contato compacto para não ofuscar o nome da empresa */}
+      <DropdownMenu>
+        <DropdownMenuTrigger className={`flex items-center gap-1 text-xs text-muted-foreground hover:text-secondary py-1 px-2 rounded-lg hover:bg-rose-50 transition-colors outline-none`}>
+          <Mail className="h-3.5 w-3.5" />
+          <span className="hidden xl:inline">Contato</span>
+          <ChevronDown className="h-3 w-3" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="bg-white/95 backdrop-blur-md border-rose-100 shadow-lg rounded-2xl z-50 p-2 text-xs">
+          <DropdownMenuItem className="rounded-xl focus:bg-rose-50 cursor-pointer">
+            <Link to="/#contato" onClick={(e) => handleLinkClick(e as any, "/#contato")} className="w-full font-medium flex items-center gap-2">
+              <Mail className="w-3.5 h-3.5 text-primary" /> Ir para Seção de Contato
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem className="rounded-xl focus:bg-rose-50 cursor-pointer">
+            <a href="mailto:projeto.endometriose.tcc@gmail.com" className="w-full font-medium flex items-center gap-2">
+              <Mail className="w-3.5 h-3.5 text-secondary" /> projeto.endometriose.tcc@gmail.com
+            </a>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       
       {mobile && (
         <Link to="/pesquisa" onClick={(e) => handleLinkClick(e as any, "/pesquisa")} className="mt-6 bg-primary hover:bg-rose-dark text-white font-bold rounded-full py-3 px-6 text-center shadow-md transition-transform hover:-translate-y-0.5 w-full">
@@ -162,59 +267,82 @@ const Header = () => {
   );
 
   return (
-    <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ease-in-out border-b shadow-sm ${
-      scrolled ? 'bg-white/90 backdrop-blur-[12px] border-rose-200/50 py-2' : 'bg-white/98 backdrop-blur-[12px] border-border py-4'
-    }`}>
-      <nav className="container mx-auto flex items-center justify-between px-4 md:px-6 max-w-7xl">
-        {/* Logo (Esquerda) */}
-        <div className="flex-shrink-0 flex items-center">
-          <Link to="/" className="font-display text-2xl md:text-3xl font-bold tracking-wide flex items-center gap-1 group">
-            <span className="text-secondary italic group-hover:text-primary transition-colors">Endome</span>
-            <span className="text-foreground">triose</span>
-          </Link>
-        </div>
+    <>
+      <header 
+        className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ease-in-out border-b shadow-sm ${
+          scrolled ? 'bg-white/90 backdrop-blur-[12px] border-rose-200/50 py-2' : 'bg-white/98 backdrop-blur-[12px] border-border py-4'
+        }`}
+      >
+        <nav className="container mx-auto flex items-center justify-between px-4 md:px-6 max-w-7xl">
+          {/* Logo (Esquerda) */}
+          <div className="flex-shrink-0 flex items-center gap-3">
+            <Link to="/" className="font-display text-2xl md:text-3xl font-bold tracking-wide flex items-center gap-1 group">
+              <span className="text-secondary italic group-hover:text-primary transition-colors">Endome</span>
+              <span className="text-foreground">triose</span>
+            </Link>
 
-        {/* Desktop Nav (Centralizado) */}
-        <div className="hidden lg:flex flex-1 items-center justify-center gap-6 xl:gap-8 text-foreground font-medium">
-          <NavItems />
-        </div>
-
-        {/* Ações (Direita) */}
-        <div className="flex items-center justify-end gap-3 flex-shrink-0">
-          
-          <Link to="/pesquisa" className="hidden lg:flex bg-primary hover:bg-rose-dark text-white font-bold rounded-full py-2 px-5 text-[15px] shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 whitespace-nowrap outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2">
-            Entrar / Cadastrar
-          </Link>
-
-          <button onClick={toggleFullscreen} className="text-foreground hover:text-secondary transition p-2 rounded-full hover:bg-rose-50 flex items-center justify-center min-w-[44px] min-h-[44px]" title="Alternar Tela Cheia">
-            {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
-          </button>
-
-          {/* Mobile Menu Toggle — Drawer */}
-          <div className="lg:hidden flex items-center">
-            <Sheet open={isOpen} onOpenChange={setIsOpen}>
-              <SheetTrigger asChild>
-                <button className="text-foreground hover:text-secondary transition p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-rose-50" aria-label="Abrir Menu">
-                  <Menu className="h-6 w-6" />
-                </button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-[85vw] max-w-[350px] bg-background border-r-border z-[100] shadow-2xl overflow-y-auto">
-                <SheetTitle className="sr-only">Menu de Navegação</SheetTitle>
-                <div className="flex flex-col gap-1 mt-8 text-foreground font-medium w-full items-start">
-                  <NavItems mobile />
-                  <div className="flex items-center gap-4 mt-8 pt-6 border-t border-border justify-center w-full">
-                    <a href="https://www.youtube.com/@project.endometriose" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-secondary transition p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-rose-50"><Youtube className="h-6 w-6" /></a>
-                    <a href="https://instagram.com/project.endo2" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-secondary transition p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-rose-50"><Instagram className="h-6 w-6" /></a>
-                    <a href="https://www.facebook.com/share/1CXwao28xD/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-secondary transition p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-rose-50"><Facebook className="h-6 w-6" /></a>
-                    <a href="mailto:projeto.endometriose.tcc@gmail.com" className="text-muted-foreground hover:text-secondary transition p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full hover:bg-rose-50"><Mail className="h-6 w-6" /></a>
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
+            {/* Nome da Empresa em Destaque no Cabeçalho */}
+            {activeCompanyName && (
+              <span className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-pink-soft text-secondary border border-rose-200 text-xs font-extrabold max-w-[240px] truncate">
+                <Building2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span className="truncate">{activeCompanyName}</span>
+              </span>
+            )}
           </div>
-        </div>
-      </nav>
-    </header>
+
+          {/* Desktop Nav (Centralizado) */}
+          <div className="hidden lg:flex flex-1 items-center justify-center gap-6 xl:gap-8 text-foreground font-medium">
+            <NavItems />
+          </div>
+
+          {/* Ações (Direita) */}
+          <div className="flex items-center justify-end gap-3 flex-shrink-0">
+            {location.pathname !== "/banco-de-dados" && (
+              <Link to="/pesquisa?tab=empresa" className="hidden lg:flex bg-secondary hover:bg-secondary/90 text-white font-bold rounded-full py-2 px-4 text-xs md:text-sm shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 whitespace-nowrap outline-none">
+                Área da Empresa
+              </Link>
+            )}
+
+            <Link to="/pesquisa" className="hidden sm:flex bg-primary hover:bg-rose-dark text-white font-bold rounded-full py-2 px-4 text-xs md:text-sm shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 whitespace-nowrap outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2">
+              Entrar / Cadastrar
+            </Link>
+
+            <button onClick={toggleFullscreen} className="text-foreground hover:text-secondary transition p-2 rounded-full hover:bg-rose-50 flex items-center justify-center min-w-[40px] min-h-[40px]" title="Alternar Tela Cheia">
+              {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+            </button>
+
+            {/* Mobile Menu Toggle — Drawer */}
+            <div className="lg:hidden flex items-center">
+              <Sheet open={isOpen} onOpenChange={setIsOpen}>
+                <SheetTrigger asChild>
+                  <button className="text-foreground hover:text-secondary transition p-2 min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full hover:bg-rose-50" aria-label="Abrir Menu">
+                    <Menu className="h-6 w-6" />
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-[85vw] max-w-[350px] bg-background border-r-border z-[100] shadow-2xl overflow-y-auto">
+                  <SheetTitle className="sr-only">Menu de Navegação</SheetTitle>
+                  <div className="flex flex-col gap-1 mt-8 text-foreground font-medium w-full items-start">
+                    {activeCompanyName && (
+                      <div className="w-full p-3 rounded-2xl bg-rose-50 border border-rose-200 mb-4 flex items-center gap-2 text-xs font-bold text-secondary">
+                        <Building2 className="w-4 h-4 text-primary shrink-0" />
+                        <span className="truncate">{activeCompanyName}</span>
+                      </div>
+                    )}
+                    <NavItems mobile />
+                    <div className="flex items-center gap-4 mt-8 pt-6 border-t border-border justify-center w-full">
+                      <a href="https://www.youtube.com/@project.endometriose" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-secondary transition p-2 rounded-full hover:bg-rose-50" title="YouTube"><Youtube className="h-5 w-5" /></a>
+                      <a href="https://instagram.com/project.endo2" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-secondary transition p-2 rounded-full hover:bg-rose-50" title="Instagram"><Instagram className="h-5 w-5" /></a>
+                      <a href="https://www.facebook.com/share/1CXwao28xD/?mibextid=wwXIfr" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-secondary transition p-2 rounded-full hover:bg-rose-50" title="Facebook"><Facebook className="h-5 w-5" /></a>
+                      <a href="mailto:projeto.endometriose.tcc@gmail.com" className="text-muted-foreground hover:text-secondary transition p-2 rounded-full hover:bg-rose-50" title="E-mail"><Mail className="h-5 w-5" /></a>
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+          </div>
+        </nav>
+      </header>
+    </>
   );
 };
 

@@ -6,22 +6,38 @@ import { GoogleGenAI } from '@google/genai';
 const geminiPlugin = () => ({
   name: 'gemini-chat-endpoint',
   configureServer(server: any) {
-    server.middlewares.use('/api/chat', async (req: any, res: any) => {
+    server.middlewares.use('/api/chat', (req: any, res: any) => {
       if (req.method !== 'POST') {
         res.statusCode = 405;
+        res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ error: 'Method Not Allowed' }));
         return;
       }
 
-      let body = '';
+      const chunks: Buffer[] = [];
       req.on('data', (chunk: any) => {
-        body += chunk;
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
       });
 
       req.on('end', async () => {
         try {
-          const { message } = JSON.parse(body || '{}');
-          const apiKey = process.env.GEMINI_API_KEY;
+          const bodyStr = Buffer.concat(chunks).toString('utf8');
+          const { message } = JSON.parse(bodyStr || '{}');
+
+          let apiKey = process.env.GEMINI_API_KEY;
+          if (!apiKey) {
+            try {
+              const fs = await import('fs');
+              if (fs.existsSync('/app/.dev.env.json')) {
+                const devEnv = JSON.parse(fs.readFileSync('/app/.dev.env.json', 'utf8'));
+                apiKey = devEnv.GEMINI_API_KEY;
+              } else if (fs.existsSync('.env')) {
+                const envContent = fs.readFileSync('.env', 'utf8');
+                const match = envContent.match(/GEMINI_API_KEY=([^\r\n]+)/);
+                if (match) apiKey = match[1].trim();
+              }
+            } catch {}
+          }
 
           if (!apiKey) {
             res.statusCode = 500;
@@ -30,9 +46,22 @@ const geminiPlugin = () => ({
             return;
           }
 
-          const ai = new GoogleGenAI({ apiKey });
-          const candidateModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+          const ai = new GoogleGenAI({
+            apiKey: apiKey || process.env.GEMINI_API_KEY,
+          });
+
+          // Modelos permitidos (gemini-3.1-flash-lite com latência ultra-baixa prioritário)
+          const candidateModels = ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.8-flash'];
           let generatedText = '';
+
+          const systemPrompt = `Você é o "Endozinho", o assistente virtual acolhedor, gentil, didático e altamente especializado em endometriose da plataforma ENDOMETRIÔMETRO.
+Sua missão é responder com empatia, conhecimento médico seguro e linguagem acessível a QUALQUER pergunta relacionada à endometriose, adenomiose e saúde feminina:
+• Sintomas e manifestações clínicas: cólicas intensas, dor pélvica crônica, dispareunia (dor na relação sexual), alterações intestinais/urinárias no período menstrual, inchaço abdominal (endo belly), fadiga extrema, dor ciática/lombar e impacto emocional.
+• Diagnóstico padrão-ouro: ultrassonografia transvaginal com preparo intestinal, ressonância magnética da pelve com protocolo específico para endometriose e avaliação clínica com ginecologista especialista.
+• Tratamentos clínicos e cirúrgicos: bloqueios hormonais (dienogeste, DIU hormonal, implantes, análogos/antagonistas de GnRH), fisioterapia pélvica especializada, nutrição anti-inflamatória, videolaparoscopia e cirurgia robótica de excisão completa dos focos.
+• Fertilidade e planejamento familiar: preservação de fertilidade, contagem de folículos e hormônio antimülleriano (AMH), técnicas de reprodução assistida (FIV) e chances reais de gravidez.
+• Impacto no trabalho e direitos: absenteísmo, presenteísmo, atestados médicos, sigilo diagnóstico garantido por lei (LGPD) e acolhimento por políticas corporativas de RH.
+Oriente sempre com empatia, reforçando que cólica incapacitante NÃO é normal. Mantenha tom amigável e acolhedor (use emojis delicados como 💕 e ✨), utilize formatação clara com tópicos e negritos, e lembre com carinho que as respostas têm caráter educativo e não substituem uma consulta médica presencial especializada. Em sinais de emergência ou dor aguda insuportável, recomende procurar pronto-atendimento.`;
 
           for (const model of candidateModels) {
             try {
@@ -40,10 +69,7 @@ const geminiPlugin = () => ({
                 model,
                 contents: message,
                 config: {
-                  systemInstruction: `Você é o "Endozinho", o assistente virtual acolhedor, gentil e educativo sobre endometriose da plataforma ENDOMETRIÔMETRO.
-Responda em português com empatia, linguagem acessível, carinho e clareza médica preventiva.
-Oriente sempre sobre a importância de consultar ginecologistas especialistas em dor pélvica e mapeamento por imagem.
-Nunca prescreva medicamentos nem dê diagnósticos definitivos. Em situações de dor intensa incapacitante ou urgência, recomende procurar atendimento médico ou pronto-socorro.`,
+                  systemInstruction: systemPrompt,
                 },
               });
               if (response.text) {

@@ -152,45 +152,77 @@ const UterusChat = () => {
     const text = userText.toLowerCase().trim();
 
     // 0. Sinais de urgência / emergência
-    if (text.includes("dor insuportável") || text.includes("dor insuportavel") || text.includes("desmai") || text.includes("sangramento muito forte") || text.includes("hemorragia") || text.includes("suicídi") || text.includes("suicidi") || text.includes("não aguento mais viver") || text.includes("nao aguento mais viver") || text.includes("febre")) {
+    if (text.includes("dor insuportável") || text.includes("dor insuportavel") || text.includes("desmai") || text.includes("sangramento muito forte") || text.includes("hemorragia") || text.includes("suicídi") || text.includes("suicidi") || text.includes("não aguento mais viver") || text.includes("nao aguento mais viver") || text.includes("febre alta")) {
       return "Estou aqui para te acolher, mas o que você relatou é um sinal de alerta que precisa de avaliação médica urgente.\n\nPor favor, não espere. Procure um pronto-socorro ou ligue para o SAMU (192) caso sinta dores incapacitantes, desmaios ou sangramento muito intenso.\n\nSe estiver sentindo profundo sofrimento emocional, o CVV (Centro de Valorização da Vida) oferece apoio confidencial 24h pelo número 188. Você não está sozinha.";
     }
 
     // 1. Saudações
     if (text.match(/^(olá|ola|oi|bom dia|boa tarde|boa noite|e ai|e aí|oie|salve|tudo bem|como vai)/i) && text.length < 25) {
-      return "Olá! Que bom conversar com você! 💕\n\nSou o Endozinho, seu assistente educativo. Você pode me fazer qualquer pergunta sobre a endometriose, seus sintomas, tratamentos, exames, fertilidade, saúde mental ou impactos na carreira profissional.\n\nQual é a sua dúvida ou como você está se sentindo hoje?";
+      return "Olá! Que alegria conversar com você! 💕\n\nSou o Endozinho, seu assistente virtual especializado em Endometriose e Saúde da Mulher. Você pode me fazer QUALQUER pergunta sobre a doença, sintomas, exames, tratamentos cirúrgicos e medicamentosos, fertilidade, alimentação, saúde emocional ou trabalho.\n\nQual é a sua dúvida ou como posso te apoiar hoje?";
     }
 
-    if (text.includes("cólica") || text.includes("dor forte") || text.includes("dói muito")) {
-      return "A cólica da endometriose dói intensamente porque o tecido endometrial presente fora do útero também sangra, causando inflamação profunda, inchaço e cicatrizes que irritam os nervos pélvicos.\n\nLembre-se: cólica incapacitante que não passa com analgésicos comuns NÃO é normal. É fundamental conversar com um ginecologista especialista para buscar qualidade de vida.";
+    // 2. O que é endometriose / adenomiose
+    if (text.includes("o que é") || text.includes("o que e") || text.includes("defin") || text.includes("adenomiose") || text.includes("conceito")) {
+      return "A **endometriose** é uma doença inflamatória crônica em que células semelhantes ao endométrio (o tecido que reveste o útero por dentro) crescem fora da cavidade uterina — como nos ovários, trompas, intestino, bexiga e peritônio pélvico.\n\nA cada ciclo menstrual, esse tecido reage aos hormônios, incha e sangra, mas sem ter por onde sair, provocando inflamação profunda, aderências e dores intensas.\n\nJá a **adenomiose** ocorre quando esse tecido endometrial se infiltra na própria parede muscular do útero (o miométrio), causando aumento do útero, cólicas fortes e sangramento abundante.";
     }
 
-    if (text.includes("sintomas")) {
-      return "Os sintomas mais comuns da endometriose incluem:\n\n• Cólicas intensas (dismenorreia)\n• Dor profunda durante a relação sexual (dispareunia)\n• Dor ao urinar ou evacuar (principalmente no período menstrual)\n• Fluxo menstrual intenso\n• Cansaço extremo (fadiga crônica)\n• Dificuldade para engravidar\n\nVocê tem sentido algum desses sinais?";
+    // 3. Cólicas e dores
+    if (text.includes("cólica") || text.includes("dor forte") || text.includes("dói muito") || text.includes("dor pelvica") || text.includes("dor pélvica") || text.includes("dor nas pernas") || text.includes("lombar")) {
+      return "A cólica da endometriose é diferente da cólica menstrual comum: ela costuma ser progressiva, incapacitante e muitas vezes não cede a analgésicos habituais.\n\nO sangramento dos focos fora do útero gera inflamação severa e pode atingir feixes nervosos na pelve, causando dores que irradiam para a lombar, cóccix e pernas.\n\n⚠️ **Importante:** Sentir dor que impede suas atividades diárias NÃO é normal! É um sinal clínico essencial para investigar a endometriose com um ginecologista especialista.";
     }
 
-    if (text.includes("diagnóstico") || text.includes("diagnostico") || text.includes("descobrir")) {
-      return "O diagnóstico correto é feito unindo a sua história clínica com exames de imagem especializados.\n\nO Ultrassom Transvaginal com Preparo Intestinal e a Ressonância Magnética da Pelve (com protocolo específico) são os exames padrão-ouro. É importante que sejam avaliados por médicos experientes em endometriose.";
+    // 4. Sintomas gerais
+    if (text.includes("sintomas") || text.includes("sinais") || text.includes("como saber")) {
+      return "Os principais sintomas da endometriose envolvem os chamados '6 D's':\n\n1. **Dismenorreia:** cólica menstrual intensa e progressiva;\n2. **Dispareunia:** dor profunda durante ou após o contato sexual;\n3. **Disquezia:** dor, desconforto, diarreia ou constipação ao evacuar (especialmente na menstruação);\n4. **Disúria:** dor, pontadas ou sensação de queimação ao urinar no período menstrual;\n5. **Dor pélvica crônica:** dor na parte baixa do abdome mesmo fora da menstruação;\n6. **Dificuldade reprodutiva:** infertilidade ou demora para engravidar.\n\nOutros sintomas comuns são cansaço extremo (fadiga crônica) e distensão abdominal ('endo belly').";
     }
 
-    if (text.includes("fertilidade") || text.includes("engravidar") || text.includes("gravidez")) {
-      return "A endometriose pode dificultar a gravidez (devido à inflamação e possíveis bloqueios nas trompas), mas NÃO significa infertilidade absoluta!\n\nMilhares de mulheres com endometriose engravidam espontaneamente ou com ajuda de tratamentos, cirurgias e fertilização in vitro (FIV). O acompanhamento médico é essencial para traçar o melhor plano para você.";
+    // 5. Relação sexual / Dispareunia
+    if (text.includes("sexo") || text.includes("relação") || text.includes("relacao") || text.includes("transar") || text.includes("dispareunia") || text.includes("penetração")) {
+      return "A dor profunda durante ou após a relação sexual (chamada de dispareunia de profundidade) é um dos sintomas mais marcantes da endometriose.\n\nEla ocorre frequentemente pelo acometimento dos ligamentos uterossacros, fundo de saco de Douglas ou septo retovaginal. Não sinta vergonha de relatar isso ao seu médico!\n\nAlém de tratamentos específicos para os focos, a **fisioterapia pélvica** é uma grande aliada para relaxar a musculatura do assoalho pélvico e recuperar a qualidade de vida sexual.";
     }
 
-    if (text.includes("trabalho") || text.includes("produtividade") || text.includes("chefe")) {
-      return "A endometriose afeta muito o dia a dia profissional, gerando cansaço e dores que derrubam a produtividade (presenteísmo) ou causam faltas (absenteísmo).\n\nConversar com o RH ou liderança sobre essa condição crônica é um passo importante. Algumas mulheres se beneficiam muito de jornadas flexíveis ou home office nos dias de crise aguda.";
+    // 6. Intestino / Fezes / Bexiga / Urina
+    if (text.includes("intestino") || text.includes("evacuar") || text.includes("fezes") || text.includes("barriga inchada") || text.includes("endo belly") || text.includes("bexiga") || text.includes("urina") || text.includes("xixi")) {
+      return "A endometriose profunda acomete com frequência o trato intestinal (reto e sigmoide) e urinário (bexiga e ureteres).\n\n• **No intestino:** pode causar dor ao evacuar, sensação de evacuação incompleta, diarreia ou prisão de ventre cíclica e sangramento retal.\n• **Na bexiga:** pode provocar urgência urinária, dor na micção e sensação de 'cistite de repetição' com urocultura negativa.\n\nO mapeamento por ressonância ou ultrassom com preparo intestinal é indispensável para identificar esses focos com precisão milimétrica.";
     }
 
-    if (text.includes("tratamento") || text.includes("remédio") || text.includes("cirurgia")) {
-      return "O tratamento é sempre individualizado e depende do que você deseja para sua vida agora.\n\nEle pode envolver o bloqueio hormonal (para suspender a menstruação e controlar a dor), fisioterapia pélvica, mudanças na dieta, e em alguns casos, cirurgia (videolaparoscopia) para remover os focos da doença.\n\nSempre converse com seu médico antes de tomar qualquer decisão ou medicamento.";
+    // 7. Diagnóstico e Exames
+    if (text.includes("diagnóstico") || text.includes("diagnostico") || text.includes("exame") || text.includes("ressonância") || text.includes("ressonancia") || text.includes("ultrassom") || text.includes("ultrassonografia") || text.includes("ca-125") || text.includes("ca 125")) {
+      return "O diagnóstico da endometriose evoluiu muito nos últimos anos! Hoje, os exames padrão-ouro não invasivos são:\n\n1. **Ultrassonografia Transvaginal com Preparo Intestinal:** realizada por médico radiologista dedicado e capacitado em endometriose, capaz de mapear nódulos nos ovários, intestino, ligamentos e bexiga.\n2. **Ressonância Magnética da Pelve com protocolo para endometriose:** essencial para estadiamento e planejamento cirúrgico.\n3. **Marcador CA-125:** pode estar elevado, mas seu resultado normal NÃO descarta a doença.\n\nO exame clínico detalhado e a escuta atenta dos sintomas continuam sendo o primeiro e mais importante passo!";
     }
 
-    // Perguntas Fora de Tópico
-    if (!text.includes("endo") && !text.includes("dor") && !text.includes("útero") && !text.includes("utero") && !text.includes("saúde") && !text.includes("médic") && !text.includes("corpo") && !text.includes("mulher") && !text.includes("sangue") && !text.includes("menstrua")) {
-      return `Que assunto interessante! Mas meu foco aqui é exclusivo: sou o Endozinho, seu assistente focado em Endometriose e Saúde da Mulher. 💕\n\nPosso te ajudar com dúvidas sobre cólicas, fertilidade, diagnósticos, direitos ou rotina com a doença. Há algo nessa área que você queira saber?`;
+    // 8. Fertilidade e Gravidez
+    if (text.includes("fertilidade") || text.includes("engravidar") || text.includes("gravidez") || text.includes("filho") || text.includes("fiv") || text.includes("infértil") || text.includes("infert")) {
+      return "A endometriose pode ser uma causa de infertilidade (devido a aderências tubárias, endometriomas ovarianos e microambiente inflamatório tóxico aos óvulos), mas **ter endometriose NÃO significa que você não poderá ser mãe!**\n\nMuitas mulheres engravidam espontaneamente após o controle clínico ou cirúrgico, e a reprodução assistida (como a Fertilização in Vitro - FIV) apresenta excelentes taxas de sucesso. Se você deseja engravidar, converse com um especialista para avaliar a reserva ovariana (hormônio antimülleriano) e planejar sua fertilidade com tranquilidade.";
     }
 
-    return `Entendi o que você quis dizer sobre "${userText}".\n\nComo Endozinho, estou aqui para te trazer informações educativas e te apoiar na sua jornada de entendimento sobre a endometriose.\n\nLembre-se que meu objetivo é informar e acolher, mas não substituo a avaliação médica presencial. Posso te ajudar detalhando mais algum ponto sobre sintomas ou tratamentos?`;
+    // 9. Tratamentos clínicos e medicamentos
+    if (text.includes("tratamento") || text.includes("remédio") || text.includes("medicamento") || text.includes("anticoncepcional") || text.includes("diu") || text.includes("mirena") || text.includes("kyleena") || text.includes("dienogeste") || text.includes("progest") || text.includes("gnrh")) {
+      return "O tratamento da endometriose busca controlar a dor, preservar a fertilidade e frear a progressão dos focos. As principais abordagens clínicas incluem:\n\n• **Bloqueio hormonal da ovulação/menstruação:** progestagênios isolados (como o dienogeste), pílulas contínuas, implantes ou DIU hormonal (levonorgestrel);\n• **Análogos ou antagonistas de GnRH:** em situações selecionadas para supressão hormonal temporária;\n• **Tratamento multidisciplinar:** anti-inflamatórios orientados, fisioterapia pélvica, suporte psicológico e exercícios físicos regulares.\n\nLembre-se: qualquer medicação deve ser prescrita exclusivamente por médico ginecologista.";
+    }
+
+    // 10. Cirurgia / Videolaparoscopia / Robótica
+    if (text.includes("cirurgia") || text.includes("laparoscopia") || text.includes("videolaparoscopia") || text.includes("robótica") || text.includes("operar") || text.includes("excisão")) {
+      return "A cirurgia para endometriose é indicada quando há falha do tratamento medicamentoso com dor incapacitante contínua, risco de obstrução intestinal/urinária ou em casos específicos de infertilidade.\n\nA técnica padrão-ouro é a **videolaparoscopia ou cirurgia robótica de excisão completa**, em que os focos e aderências são removidos pela raiz, preservando os órgãos e a reserva ovariana.\n\nA cirurgia deve ser realizada por equipe multidisciplinar experiente (ginecologista cirurgião, coloproctologista e urologista se necessário).";
+    }
+
+    // 11. Estadiamento / Graus da Endometriose
+    if (text.includes("grau") || text.includes("estágio") || text.includes("estagio") || text.includes("estadiamento") || text.includes("rasrm") || text.includes("enzian")) {
+      return "A endometriose é tradicionalmente classificada em 4 graus (classificação rASRM):\n\n• **Grau I (Mínima):** pequenos implantes superficiais isolados;\n• **Grau II (Leve):** focos superficiais um pouco mais numerosos;\n• **Grau III (Moderada):** implantes mais profundos, possíveis endometriomas ovarianos e aderências iniciais;\n• **Grau IV (Grave/Severa):** grandes endometriomas ovarianos, aderências densas e focos profundos no intestino ou bexiga (classificação #Enzian).\n\n⚠️ **Curiosidade importante:** A intensidade da dor NEM SEMPRE reflete o grau anatômico! Uma mulher com grau I pode sentir dores severas, enquanto outra com grau IV pode ter sintomas mais sutis. Cada corpo é único!";
+    }
+
+    // 12. Alimentação e estilo de vida
+    if (text.includes("alimenta") || text.includes("dieta") || text.includes("comer") || text.includes("nutri") || text.includes("inflama") || text.includes("açúcar") || text.includes("leite") || text.includes("glúten") || text.includes("gluten")) {
+      return "Como a endometriose é uma doença inflamatória crônica, a **nutrição anti-inflamatória** desempenha um papel fundamental no alívio dos sintomas!\n\n• **Alimentos que ajudam:** peixes ricos em ômega-3, azeite de oliva extravirgem, frutas vermelhas, cúrcuma, gengibre, folhas verdes escuras, sementes (linhaça, chia) e água abundante.\n• **Alimentos para moderar ou evitar:** ultraprocessados, excesso de açúcar refinado, gorduras trans, carnes vermelhas em excesso e consumo exagerado de cafeína e álcool.\n\nO acompanhamento com nutricionista especializada em saúde da mulher faz enorme diferença!";
+    }
+
+    // 13. Trabalho, Direitos e Produtividade
+    if (text.includes("trabalho") || text.includes("produtividade") || text.includes("chefe") || text.includes("empresa") || text.includes("rh") || text.includes("atestado") || text.includes("falta") || text.includes("demissão") || text.includes("lei") || text.includes("direito")) {
+      return "A endometriose tem profundo impacto na vida profissional:\n\n• Causa **absenteísmo** (faltas justificadas por atestados médicos) e **presenteísmo** (trabalhar sob dor intensa com queda acentuada de foco e produtividade);\n• A colaboradora tem direito garantido por lei à emissão de atestados médicos e ao sigilo de seus diagnósticos (conforme a LGPD e resoluções do CFM);\n• Empresas inovadoras e conscientes oferecem políticas de apoio, como flexibilidade de horários, regime de trabalho híbrido nos dias críticos e encaminhamento a especialistas.\n\nA plataforma ENDOMETRIÔMETRO foi criada exatamente para gerar dados corporativos que sensibilizem o RH e apoiem as mulheres no ambiente de trabalho!";
+    }
+
+    // 14. Resposta educativa ampla para qualquer outro questionamento relacionado
+    return `Que pergunta relevante sobre a endometriose! 💕\n\nComo Endozinho, seu assistente educativo no ENDOMETRIÔMETRO, posso te assegurar que você não está sozinha e que toda dúvida sobre seu corpo, dores e saúde merece atenção cuidadosa.\n\nA endometriose é uma condição crônica complexa que exige abordagem acolhedora e integrada: diagnóstico com exames específicos (como o ultrassom com preparo intestinal), controle de dor personalizado, cuidado nutricional e acompanhamento especializado.\n\nLembre-se sempre: sentir dores incapacitantes que travam a sua vida NUNCA deve ser normalizado. Posso detalhar mais algum aspecto sobre sintomas, exames ou tratamentos para te ajudar?`;
   };
 
   const handleSendText = async (textToSend: string) => {
