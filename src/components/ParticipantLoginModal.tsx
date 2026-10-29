@@ -276,13 +276,54 @@ export const ParticipantLoginModal = ({
           return;
         }
 
-        toast.success("Conta criada com sucesso!");
+        // Se for participante vinculada a empresa corporativa
+        if (role === "participante" && empresaToken) {
+          try {
+            // Resolver id da empresa
+            const { data: comp } = await supabase
+              .from("companies")
+              .select("id, name, nome_empresa")
+              .or(`code_slug.eq.${empresaToken},id.eq.${empresaToken}`)
+              .limit(1)
+              .maybeSingle();
+
+            const resolvedCompId = comp?.id || empresaToken;
+            await supabase.from("profiles").update({ company_id: resolvedCompId }).eq("id", userId);
+
+            // Registro inicial no cache da empresa
+            const key = `respostas_empresa_${resolvedCompId}`;
+            const existingList = JSON.parse(localStorage.getItem(key) || "[]");
+            const newEntry = {
+              id: userId,
+              nome: nome,
+              email: cleanEmail,
+              idade: "25 - 34",
+              diagnosticoPrevio: "Não",
+              resultado: "Fator Baixo — Cadastro Realizado",
+              nivelProbabilidade: "Baixo",
+              intensidadeDor: 0,
+              sintomas: [],
+              impactoTrabalho: "Leve",
+              horasAusencia: 0,
+              diasAtestado: 0,
+              dataResposta: new Date().toISOString(),
+              company_id: resolvedCompId,
+            };
+            existingList.unshift(newEntry);
+            localStorage.setItem(key, JSON.stringify(existingList));
+            window.dispatchEvent(new CustomEvent("nova_resposta_empresa", { detail: newEntry }));
+          } catch (e) {
+            console.warn("Aviso ao vincular participante à empresa:", e);
+          }
+        }
+
+        toast.success(empresaNome || empresaToken ? `Cadastro de colaboradora realizado com sucesso!` : "Conta criada com sucesso!");
         onClose();
 
         if (onSuccess) {
           onSuccess();
         } else {
-          navigate("/pesquisa");
+          navigate(empresaToken ? `/pesquisa?empresa=${empresaToken}` : "/pesquisa");
         }
       }
     } catch (err: any) {

@@ -10,8 +10,10 @@ import { supabase } from "@/lib/supabase";
 import { 
   Building, ShieldCheck, Copy, Share2, 
   FileText, Download, Plus, Calendar, Loader2, MapPin,
-  Terminal, Users, FileDown, AlertTriangle, Stethoscope, CheckCircle2, Search, Sparkles, ShieldAlert, RefreshCw, LogOut, ExternalLink
+  Terminal, Users, FileDown, AlertTriangle, Stethoscope, CheckCircle2, Search, Sparkles, ShieldAlert, RefreshCw, LogOut, ExternalLink,
+  QrCode, UserPlus, Printer
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { gerarRelatorioInstituicao, gerarRelatorioConsolidadoEmpresa, ColaboradoraRegistro } from "@/lib/relatorio-pdf/gerarPDF";
@@ -178,6 +180,93 @@ const EmpresaDashboard = () => {
   const [showNovaPesquisa, setShowNovaPesquisa] = useState(false);
   const [novoTitulo, setNovoTitulo] = useState("");
   const [novaDescricao, setNovaDescricao] = useState("");
+
+  // Estados para QR Code e Cadastro de Colaboradora
+  const [qrModalSurvey, setQrModalSurvey] = useState<SurveyItem | null>(null);
+  const [showCadastrarColabModal, setShowCadastrarColabModal] = useState(false);
+  const [colabNome, setColabNome] = useState("");
+  const [colabEmail, setColabEmail] = useState("");
+  const [colabSenha, setColabSenha] = useState("Colab@2026");
+  const [colabBairro, setColabBairro] = useState("");
+  const [salvandoColab, setSalvandoColab] = useState(false);
+
+  const handleCadastrarColaboradora = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!colabNome || !colabEmail) {
+      toast.error("Informe ao menos o nome e e-mail da colaboradora.");
+      return;
+    }
+    setSalvandoColab(true);
+    try {
+      const cleanEmail = colabEmail.trim().toLowerCase();
+      // 1. Tenta criar usuário ou associar ao Supabase
+      const { data: authData } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password: colabSenha || "Colab@2026",
+        options: {
+          data: {
+            full_name: colabNome,
+            company_id: companyId,
+            role: "participante"
+          }
+        }
+      });
+
+      const newUserId = authData?.user?.id || `colab_${Date.now()}`;
+
+      // 2. Salva profile com company_id vinculado à empresa
+      await supabase.from("profiles").upsert([
+        {
+          id: newUserId,
+          email: cleanEmail,
+          full_name: colabNome,
+          nome: colabNome,
+          role: "participante",
+          company_id: companyId
+        }
+      ]);
+
+      // 3. Adiciona registro imediato na lista de colaboradoras da empresa
+      const novoRegistro: ColaboradoraRegistro = {
+        id: newUserId,
+        nome: colabNome,
+        email: cleanEmail,
+        idade: "25 - 34",
+        diagnosticoPrevio: "Não",
+        resultado: "Fator Baixo — Aguardando preenchimento",
+        nivelProbabilidade: "Baixo",
+        intensidadeDor: 0,
+        sintomas: [],
+        impactoTrabalho: "Leve",
+        horasAusencia: 0,
+        diasAtestado: 0,
+        dataResposta: new Date().toISOString(),
+      };
+
+      setColaboradoras(prev => [novoRegistro, ...prev]);
+
+      // Persistir em localStorage para a empresa
+      if (companyId) {
+        const key = `respostas_empresa_${companyId}`;
+        const cached = JSON.parse(localStorage.getItem(key) || "[]");
+        cached.unshift(novoRegistro);
+        localStorage.setItem(key, JSON.stringify(cached));
+      }
+
+      toast.success(`Colaboradora ${colabNome} cadastrada com sucesso!`, {
+        description: `E-mail: ${cleanEmail}. O formulário e o relatório estão vinculados à empresa.`,
+      });
+
+      setColabNome("");
+      setColabEmail("");
+      setShowCadastrarColabModal(false);
+      window.dispatchEvent(new Event("nova_resposta_empresa"));
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao cadastrar colaboradora.");
+    } finally {
+      setSalvandoColab(false);
+    }
+  };
 
   const handleSairConta = async () => {
     try {
@@ -932,6 +1021,26 @@ const EmpresaDashboard = () => {
                       <ExternalLink className="w-3.5 h-3.5" /> Abrir Questionário
                     </Button>
 
+                    <Button 
+                      onClick={() => setQrModalSurvey(s)}
+                      size="sm" 
+                      variant="outline" 
+                      className="border-primary/60 text-primary hover:bg-rose-50 font-bold text-xs gap-1.5 flex-1 md:flex-initial shadow-xs"
+                      title="Gerar QR Code para a colaboradora escanear com a câmera do celular"
+                    >
+                      <QrCode className="w-3.5 h-3.5" /> QR Code
+                    </Button>
+
+                    <Button 
+                      onClick={() => setShowCadastrarColabModal(true)}
+                      size="sm" 
+                      variant="outline" 
+                      className="border-secondary/60 text-secondary hover:bg-rose-50 font-bold text-xs gap-1.5 flex-1 md:flex-initial shadow-xs"
+                      title="Cadastrar colaboradora vinculada diretamente à empresa"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" /> Cadastrar Funcionária
+                    </Button>
+
                     <Button onClick={() => copiarLinkExclusivo(s.token)} size="sm" variant="outline" className="border-rose-300 text-secondary font-bold text-xs gap-1.5 flex-1 md:flex-initial">
                       <Copy className="w-3.5 h-3.5" /> Copiar Link
                     </Button>
@@ -1231,7 +1340,190 @@ const EmpresaDashboard = () => {
 
         </div>
       </main>
-      
+
+      {/* Modal QR Code da Pesquisa Corporativa */}
+      {qrModalSurvey && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-rose-200 shadow-2xl relative text-center">
+            <button
+              onClick={() => setQrModalSurvey(null)}
+              className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-foreground rounded-full hover:bg-rose-50 transition"
+              aria-label="Fechar modal"
+            >
+              ✕
+            </button>
+
+            <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center mx-auto mb-4 text-primary">
+              <QrCode className="w-7 h-7" />
+            </div>
+
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-pink-soft text-secondary uppercase tracking-wider mb-2">
+              Acesso da Colaboradora
+            </span>
+
+            <h3 className="font-display text-2xl font-bold text-foreground">
+              QR Code da Pesquisa
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
+              A colaboradora aponta a câmera do celular para este QR Code para abrir o formulário e criar seu cadastro vinculado a <strong>{companyName || "sua empresa"}</strong>.
+            </p>
+
+            <div className="my-6 p-4 bg-gradient-to-b from-rose-50/60 to-white rounded-2xl border-2 border-dashed border-rose-200 flex flex-col items-center justify-center">
+              <div className="p-3 bg-white rounded-xl shadow-md border border-rose-100">
+                <QRCodeSVG
+                  value={`${window.location.origin}/pesquisa?empresa=${qrModalSurvey.token}`}
+                  size={190}
+                  level="H"
+                  includeMargin={false}
+                  fgColor="#7B2D40"
+                />
+              </div>
+              <span className="text-[11px] font-mono font-bold text-rose-800 mt-3 truncate max-w-full px-2">
+                {companyName} • {qrModalSurvey.title}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 bg-rose-50/50 p-2.5 rounded-xl border border-rose-100 text-xs">
+                <Input
+                  readOnly
+                  value={`${window.location.origin}/pesquisa?empresa=${qrModalSurvey.token}`}
+                  className="text-xs bg-white h-8 border-rose-200 text-foreground font-mono"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => copiarLinkExclusivo(qrModalSurvey.token)}
+                  className="bg-primary hover:bg-rose-dark text-white font-bold h-8 px-3 shrink-0 rounded-lg text-xs"
+                >
+                  <Copy className="w-3.5 h-3.5 mr-1" /> Copiar
+                </Button>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => window.print()}
+                  variant="outline"
+                  className="flex-1 border-rose-200 text-foreground font-bold text-xs h-10 rounded-xl gap-1.5 hover:bg-rose-50"
+                >
+                  <Printer className="w-4 h-4 text-primary" /> Imprimir / Salvar
+                </Button>
+                <Button
+                  onClick={() => {
+                    const url = `/pesquisa?empresa=${qrModalSurvey.token}`;
+                    window.open(url, "_blank");
+                  }}
+                  className="flex-1 bg-secondary hover:bg-secondary/90 text-white font-bold text-xs h-10 rounded-xl gap-1.5"
+                >
+                  <ExternalLink className="w-4 h-4" /> Abrir Questionário
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Cadastro Rápido de Colaboradora no RH */}
+      {showCadastrarColabModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full border border-rose-200 shadow-2xl relative">
+            <button
+              onClick={() => setShowCadastrarColabModal(false)}
+              className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-foreground rounded-full hover:bg-rose-50 transition"
+              aria-label="Fechar modal"
+            >
+              ✕
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center text-primary font-bold">
+                <UserPlus className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-display text-xl font-bold text-foreground">
+                  Cadastrar Funcionária na Empresa
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Vincular colaboradora diretamente ao painel da instituição <strong>{companyName}</strong>.
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCadastrarColaboradora} className="space-y-4">
+              <div>
+                <Label htmlFor="colabNome" className="text-xs font-bold text-foreground">Nome Completo da Colaboradora *</Label>
+                <Input
+                  id="colabNome"
+                  value={colabNome}
+                  onChange={e => setColabNome(e.target.value)}
+                  placeholder="Ex: Mariana Silva"
+                  className="rounded-xl mt-1 text-sm"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="colabEmail" className="text-xs font-bold text-foreground">E-mail Corporativo ou Pessoal *</Label>
+                <Input
+                  id="colabEmail"
+                  type="email"
+                  value={colabEmail}
+                  onChange={e => setColabEmail(e.target.value)}
+                  placeholder="mariana.silva@empresa.com"
+                  className="rounded-xl mt-1 text-sm"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="colabSenha" className="text-xs font-bold text-foreground">Senha Provisória</Label>
+                  <Input
+                    id="colabSenha"
+                    value={colabSenha}
+                    onChange={e => setColabSenha(e.target.value)}
+                    placeholder="Colab@2026"
+                    className="rounded-xl mt-1 text-sm"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="colabBairro" className="text-xs font-bold text-foreground">Departamento / Bairro</Label>
+                  <Input
+                    id="colabBairro"
+                    value={colabBairro}
+                    onChange={e => setColabBairro(e.target.value)}
+                    placeholder="Ex: Administrativo"
+                    className="rounded-xl mt-1 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-rose-50 p-3 rounded-xl border border-rose-100 text-xs text-rose-900 leading-relaxed">
+                🔒 <strong>Privacidade LGPD:</strong> A colaboradora receberá acesso para responder ao questionário de saúde. O relatório individual completo é restrito a ela, e os dados consolidados passam a integrar os relatórios de RH da sua empresa.
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowCadastrarColabModal(false)}
+                  className="rounded-xl"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={salvandoColab}
+                  className="bg-primary hover:bg-rose-dark text-white font-bold rounded-xl gap-2"
+                >
+                  {salvandoColab ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                  {salvandoColab ? "Cadastrando..." : "Confirmar Cadastro"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <TerminalConsolidadoModal
         isOpen={showTerminalModal}
         onClose={() => setShowTerminalModal(false)}

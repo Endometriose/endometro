@@ -115,7 +115,7 @@ const EducativoSection = () => {
               key={tema.id} 
               id={tema.id}
               onClick={() => setSelectedTema(tema)}
-              className="bg-pink-soft/40 rounded-2xl p-6 border border-rose-200/80 shadow-sm hover:shadow-lg hover:border-primary/50 transition-all duration-300 cursor-pointer group flex flex-col items-center text-center relative overflow-hidden"
+              className="scroll-mt-28 bg-pink-soft/40 rounded-2xl p-6 border border-rose-200/80 shadow-sm hover:shadow-lg hover:border-primary/50 transition-all duration-300 cursor-pointer group flex flex-col items-center text-center relative overflow-hidden"
             >
               <div className="w-14 h-14 rounded-2xl bg-white shadow-md flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 border border-rose-100">
                 {tema.icon}

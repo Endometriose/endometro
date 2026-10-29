@@ -115,21 +115,30 @@ const Header = () => {
       const id = sectionId || to.replace("/#", "");
       let targetId = id;
       if (id === "tratamentos") targetId = "tratamento";
-      if (id === "duvidas") targetId = "relatos";
       if (id === "diagnostico") targetId = "investigacao";
-      if (id === "oquee-endometriometro") targetId = "oquee-endometriometro";
+      if (id === "inicio") {
+        if (location.pathname === "/") {
+          e.preventDefault();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          window.history.pushState(null, "", "/");
+          return;
+        } else {
+          navigate("/");
+          return;
+        }
+      }
 
       if (location.pathname === "/") {
         e.preventDefault();
         const element = document.getElementById(targetId) || document.getElementById(id);
         if (element) {
-          const yOffset = -80; // Altura do cabeçalho
+          const yOffset = -85; // Altura do cabeçalho
           const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
           window.scrollTo({ top: y, behavior: "smooth" });
           window.history.pushState(null, "", to);
           
           // Efeito de destaque no título de destino
-          const title = element.querySelector("h2");
+          const title = element.querySelector("h2, h3, h4");
           if (title) {
             title.classList.add("highlight-title");
             setTimeout(() => title.classList.remove("highlight-title"), 2000);

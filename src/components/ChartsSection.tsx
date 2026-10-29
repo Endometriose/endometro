@@ -3,7 +3,7 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   ResponsiveContainer, Legend
 } from "recharts";
-import { Maximize2, ChevronLeft, ChevronRight, AlertCircle, RefreshCw, Loader2, FlaskConical } from "lucide-react";
+import { Maximize2, ChevronLeft, ChevronRight, AlertCircle, RefreshCw, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useIndicadores } from "@/hooks/useIndicadores";
@@ -230,7 +230,14 @@ const ChartsSection = ({ companyId }: ChartsSectionProps = {}) => {
             {/* 3 Gráficos principais */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {CHARTS_LIST.map((item) => (
-                <div key={item.key} onClick={() => setActiveChartKey(item.key)} className="bg-white rounded-2xl p-5 shadow-sm border border-rose-100 flex flex-col h-[340px] hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group relative">
+                <div 
+                  key={item.key} 
+                  id={item.key === 'productivity' ? 'impacto' : undefined}
+                  onClick={() => setActiveChartKey(item.key)} 
+                  className={`bg-white rounded-2xl p-5 shadow-sm border border-rose-100 flex flex-col h-[340px] hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group relative ${
+                    item.key === 'productivity' ? 'scroll-mt-28' : ''
+                  }`}
+                >
                   <div className="flex justify-between items-start mb-2 pr-8">
                     <div>
                       <h3 className="font-display text-sm md:text-base font-bold text-foreground leading-tight">{item.title}</h3>
@@ -308,13 +315,6 @@ const ChartsSection = ({ companyId }: ChartsSectionProps = {}) => {
                   </span>
                 )}
               </div>
-              
-              {data?.incluiu_teste && (
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-800 font-bold text-sm">
-                  <FlaskConical className="w-4 h-4" />
-                  Dados de teste incluídos — não representam respostas reais
-                </div>
-              )}
             </div>
 
             {/* Modal: Gráficos Principais */}

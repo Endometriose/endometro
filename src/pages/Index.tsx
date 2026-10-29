@@ -18,12 +18,15 @@ const Index = () => {
         const id = location.hash.replace("#", "");
         let targetId = id;
         if (id === "tratamentos") targetId = "tratamento";
-        if (id === "duvidas") targetId = "relatos";
         if (id === "diagnostico") targetId = "investigacao";
+        if (id === "inicio") {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
 
         const element = document.getElementById(targetId) || document.getElementById(id);
         if (element) {
-          const yOffset = -90;
+          const yOffset = -85;
           const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
           window.scrollTo({ top: y, behavior: "smooth" });
         }

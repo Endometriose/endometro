@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Send, Quote } from "lucide-react";
+import { Send, Quote, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
@@ -161,6 +161,63 @@ const RelatosSection = () => {
             </form>
           </div>
 
+        </div>
+
+        {/* SEÇÃO DE DÚVIDAS FREQUENTES (FAQ) - ID "duvidas" */}
+        <div id="duvidas" className="scroll-mt-28 mt-20 pt-16 border-t border-rose-200/80">
+          <div className="text-center mb-10">
+            <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-rose-100 text-secondary font-bold text-xs uppercase tracking-wider mb-2">
+              <HelpCircle className="w-3.5 h-3.5" /> Esclarecimentos Importantes
+            </span>
+            <h3 className="font-display text-3xl font-bold text-foreground">
+              Dúvidas Frequentes sobre a Pesquisa
+            </h3>
+            <p className="text-muted-foreground text-sm max-w-xl mx-auto mt-1">
+              Confira as respostas para as perguntas mais comuns de participantes e instituições parceiras.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+            <div className="bg-white rounded-2xl p-6 border border-rose-200/80 shadow-xs hover:shadow-md transition">
+              <h4 className="font-display font-bold text-base text-foreground mb-2 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-bold">1</span>
+                As respostas da colaboradora são anônimas para a empresa?
+              </h4>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                Sim! Em cumprimento à LGPD e à metodologia científica, os dados apresentados à diretoria e ao público no painel da empresa são consolidados em indicadores coletivos (k-anonymity mínimo de 5). Somente a própria funcionária tem acesso ao seu relatório de triagem individual completo.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 border border-rose-200/80 shadow-xs hover:shadow-md transition">
+              <h4 className="font-display font-bold text-base text-foreground mb-2 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-bold">2</span>
+                O Endometriômetro substitui consulta médica?
+              </h4>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                Não. O Endometriômetro é uma ferramenta de triagem clínica, acolhimento e conscientização. Ele calcula a probabilidade e o risco a partir dos sintomas declarados para orientar a colaboradora a procurar especialistas em endometriose.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 border border-rose-200/80 shadow-xs hover:shadow-md transition">
+              <h4 className="font-display font-bold text-base text-foreground mb-2 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-bold">3</span>
+                Como a colaboradora faz o cadastro dentro da empresa?
+              </h4>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                A empresa gera o link exclusivo ou o QR Code no painel institucional. Ao abrir, a colaboradora cria seu cadastro de participante vinculado à empresa, responde ao formulário e tem seus relatórios gerados instantaneamente.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 border border-rose-200/80 shadow-xs hover:shadow-md transition">
+              <h4 className="font-display font-bold text-base text-foreground mb-2 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center font-bold">4</span>
+                O que a empresa recebe com a pesquisa?
+              </h4>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                A instituição tem acesso a relatórios executivos em PDF com métricas de presenteísmo e absenteísmo, cálculo do impacto produtivo e diretrizes corporativas para implementar programas de acolhimento e suporte à saúde feminina.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </section>

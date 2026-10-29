@@ -922,15 +922,44 @@ const Pesquisa = () => {
               
               <div className="text-center mb-8">
                 {empresaVinculada && (
-                  <span className="inline-flex items-center gap-1.5 px-4 py-1 rounded-full bg-rose-100 text-secondary font-bold text-xs mb-3 border border-rose-200">
-                    <Building2 className="w-3.5 h-3.5" /> Pesquisa Vinculada à Empresa: {empresaInfo?.name || empresaVinculada.replace(/_/g, " ")}
-                  </span>
+                  <div className="mb-6 p-5 rounded-3xl bg-gradient-to-r from-rose-50 via-pink-soft to-rose-50 border border-rose-300 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-left">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-12 h-12 rounded-2xl bg-white shadow-xs flex items-center justify-center text-primary font-bold border border-rose-200 shrink-0">
+                        <Building2 className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-extrabold text-secondary uppercase tracking-wider block">
+                          Pesquisa Corporativa & Cadastro de Colaboradora
+                        </span>
+                        <h3 className="font-display font-bold text-lg text-foreground">
+                          Empresa: {empresaInfo?.name || empresaVinculada.replace(/_/g, " ")}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
+                          Questionário de saúde feminina com proteção LGPD. O seu relatório individual é sigiloso e acessível apenas por você e pela gestão de saúde da sua empresa.
+                        </p>
+                      </div>
+                    </div>
+
+                    {!currentUser && (
+                      <Button
+                        type="button"
+                        onClick={() => setIsLoginModalOpen(true)}
+                        size="sm"
+                        className="bg-primary hover:bg-rose-dark text-white font-bold text-xs rounded-xl shadow-xs shrink-0 self-stretch sm:self-auto py-2.5 px-4"
+                      >
+                        Cadastrar Colaboradora
+                      </Button>
+                    )}
+                  </div>
                 )}
                 <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-2">
                   Questionário ENDOMETRIÔMETRO
                 </h2>
                 <p className="text-muted-foreground text-sm max-w-lg mx-auto">
-                  Apresentação da pesquisa: responda de forma individual para contribuir com a construção de dados estatísticos sobre a endometriose e seus reflexos no trabalho.
+                  {empresaVinculada 
+                    ? `Preencha suas informações para gerar sua triagem confidencial vinculada à ${empresaInfo?.name || "empresa"}.`
+                    : "Apresentação da pesquisa: responda de forma individual para contribuir com a construção de dados estatísticos sobre a endometriose e seus reflexos no trabalho."
+                  }
                 </p>
               </div>
 
